@@ -41,6 +41,8 @@ library(BSDA)
 library(bigutilsr) #tukey_mc_up outlier detection
 library(forestplot)
 library(meta)
+library(EnhancedVolcano)
+library(wesanderson)
 
 # source the script with functions
 source("/Users/periwal/ShikiFactory/WP3/SW_SF100/Functions.R")
@@ -50,7 +52,11 @@ bug_desc<-read.table(file = "../Bug_desc", sep = "\t", header = TRUE)
 head(bug_desc)
 nrow(bug_desc) #26
 
+plate_layout<-data.frame(read.table("../plate_layout", header = TRUE, sep = '\t'))
+head(plate_layout)
+nrow(plate_layout) #14,976
 
+##################################### READING RAW FILES AND FITTING CURVES
 # Currently missing:
 # NT5076 not growing in any replicate (kick-out)
 # NT5023 Rep-3 not growing
@@ -124,7 +130,6 @@ for(j in 1:length(file.merged)){
   in_file
   
   Y<-data.frame(read.table(file.merged[j], header = TRUE, sep = '\t', stringsAsFactors = FALSE))
-  #Y[,4]<-Y[,4]/60
   head(Y)
   lapply(Y, class)
   
@@ -177,12 +182,7 @@ for(j in 1:length(file.merged)){
           rep
           plate<-plate_dat[1,3]
           plate
-          #drug<-plate_dat[1,4]
-          #drug
-          
-          #plot_file<-paste0(ID,"_",rep,"_",plate)
-          #plot_file
-          
+
           data<-plate_dat[,-(1:3)]
           data
 
@@ -203,7 +203,23 @@ for(j in 1:length(file.merged)){
               current_well[,col_name]
               current_well
               
-              #each time create a new variable for each well
+              # # find zero OD and start reading from there
+              # ind<-which(current_well[,col_name] == 0)
+              # ind
+              # length(ind)
+              # 
+              # if(ind %in% c('1','2','3','4')){
+              #   
+              #   m<-match(ind, c('1','2','3','4'))
+              #   m<-max(na.omit(m))
+              #   m
+              #   current_well<-subset(current_well[m:nrow(current_well),])
+              #   current_well$time<-c(0:(nrow(current_well)-1))
+              #   current_well
+              #   
+              # }
+              
+               #each time create a new variable for each well
               gc_fit<-SummarizeGrowth(data_t = current_well[,"time"], data_n = current_well[,col_name])
               #saveRDS(gc_fit, file = paste0("/Users/vinitaperiwal/GrowthCurver/models/",ID,"_",rep,"_",plate,"_",drug,"_",col_name,".rds"))
               
@@ -241,7 +257,7 @@ for(j in 1:length(file.merged)){
               
               gc_fit_params<-rbind(gc_fit_params, fitted_param)
               tail(gc_fit_params)
-              
+                
             }
           }
           
@@ -256,78 +272,47 @@ for(j in 1:length(file.merged)){
 
 
 head(fitted_values)
-nrow(fitted_values) #1,022,784
+nrow(fitted_values) #depends on time points
 View(fitted_values)
 
+fitted_values<-fitted_values %>% filter(Bug_ID != 'NT5076')
+gc_fit_params<-gc_fit_params %>% filter(Bug_ID != 'NT5076')
+
 head(gc_fit_params)
-nrow(gc_fit_params) #should be equal to number of wells: 96 for 1 plate 44,928
+nrow(gc_fit_params) #should be equal to number of wells: 96 for 1 plate 41,472
 View(gc_fit_params)
 
 write.table(fitted_values, file = "GC_fitted_model_values", sep = "\t", quote = FALSE, row.names = FALSE)
 write.table(gc_fit_params, file = "GC_fit_params", sep = "\t", quote = FALSE, row.names = FALSE)
 
 
-
-
-############ questionable fits
-plate_layout<-data.frame(read.table("../plate_layout", header = TRUE, sep = '\t'))
-head(plate_layout)
-nrow(plate_layout) #14,976
-
-#read fitted values of models
-fit_params<-data.frame(read.table("GC_fit_params", header = TRUE, sep = '\t', stringsAsFactors = FALSE))
-head(fit_params)
-nrow(fit_params) #44,928
-
-fit_params_layout<-merge(plate_layout, fit_params, by=c("Bug_ID","Plate_no","col_name"))
-View(fit_params_layout)
-
-# remove NT5076
-fit_params_layout<-fit_params_layout %>% filter(Bug_ID != 'NT5076')
-
-ques_fit<-fit_params_layout %>% filter(note != '')
-nrow(ques_fit)
-View(ques_fit)
-
-
-
-
-
 ############################### Read fitted values
-#bug names
-bug_desc<-read.table(file = "../Bug_desc", sep = "\t", header = TRUE)
-head(bug_desc)
-nrow(bug_desc) #26
-
 #read fitted values of models
 fits<-data.frame(read.table("GC_fitted_model_values", header = TRUE, sep = '\t', stringsAsFactors = FALSE))
 head(fits)
-nrow(fits) #1,022,784
+nrow(fits) #97,5552
 
 merge_plate_layout_fits<-merge(plate_layout, fits, by=c("Bug_ID","Plate_no","col_name"))
-nrow(merge_plate_layout_fits) #1,022,784
+nrow(merge_plate_layout_fits) #97,5552
 
-head(merge_plate_layout_fits)
+View(merge_plate_layout_fits)
 
 merge_plate_layout_fits<-merge(merge_plate_layout_fits,bug_desc, by="Bug_ID")
 write.table(merge_plate_layout_fits, file = "../Figures/fitted_values", sep = "\t", quote = FALSE, row.names = FALSE)
 
 ############### plot raw and fitted ODs
-
-#merge techs and bug desc
-techs_bugs<-merge(merge_plate_layout_fits,bug_desc, by="Bug_ID")
-head(techs_bugs)
-nrow(techs_bugs)
-techs_bugs$color<-paste0(techs_bugs$Replicate_no,"_",techs_bugs$tech)
+merge_plate_layout_fits<-read.table(file = "../Figures/fitted_values", sep = "\t", header = TRUE)
+merge_plate_layout_fits$color<-paste0(merge_plate_layout_fits$Replicate_no,"_",merge_plate_layout_fits$tech)
+View(merge_plate_layout_fits)
 
 ### plot plate wise replicates for each bug
 
-bugs<-unique(techs_bugs$Bug_ID)
+bugs<-unique(merge_plate_layout_fits$Bug_ID)
 bugs
 
 for(i in 1:length(bugs)){
   
-  f<-techs_bugs %>% filter(Bug_ID == bugs[i])
+  f<-merge_plate_layout_fits %>% filter(Bug_ID == bugs[i])
   
   plates<-unique(f$Plate_no)
   plates
@@ -340,7 +325,7 @@ for(i in 1:length(bugs)){
     CairoSVG(file=paste("../Figures/", bugs[i], "_", plates[j], ".svg", sep = ""), width = 15, height = 8, bg = "white")
     print(p %>% dplyr::group_by(Bug_ID,Plate_no,compound,Replicate_no) %>%
             ggplot(aes(x=time, y=fitted,group=color)) + geom_line(aes(color=Replicate_no), size=0.2) + scale_color_d3(palette = "category20") +
-            geom_point(aes(y=OD,color=tech), size=0.000001) + facet_wrap("compound", scales = "free", ncol = 8, nrow = 6) +  
+            geom_point(aes(y=OD,color=tech), size=0.000001) + facet_wrap("compound",scales = "free",ncol = 8, nrow = 6) +  
             ggtitle(paste(bugs[i],p$Sp_short,plates[j],sep=":")) + scale_x_continuous(name = "Time (Hours)", limits = c(0,25)) + scale_y_continuous(name="bg corrected OD") + 
             th + theme_minimal())
     dev.off()
@@ -348,690 +333,711 @@ for(i in 1:length(bugs)){
   }
 }
 
+head(merge_plate_layout_fits)
 # example single well plot
-CairoSVG(file=paste("../Figures/NT5009_asp_p1.svg"), width = 4, height = 3, bg = "white")
-techs_bugs %>% filter(Bug_ID == 'NT5009' & col_name %in% c('E9','E10') & Plate_no == 'plate1') %>%
-  ggplot(aes(x=time, y=fitted,group=color)) + geom_line(aes(color=Replicate_no),size=0.2) + 
-  geom_point(aes(y=OD, color=tech), size=0.0001) + scale_color_aaas() + 
-  ggtitle(paste('E. rectale')) + scale_x_continuous(name = "Time (Hours)", limits = c(0,25)) + scale_y_continuous(name="bg corrected OD") + 
+CairoSVG(file=paste("../Figures/NT5037_dmso_sacc_treh_p1.svg"), width = 6, height = 4, bg = "white")
+merge_plate_layout_fits %>% dplyr::group_by(Bug_ID,Plate_no,compound,Replicate_no) %>% 
+  filter(Bug_ID == 'NT5019' & compound %in% c('DMSO','Mannitol') & Plate_no %in% c('plate1')) %>%
+  ggplot(aes(x=time, y=fitted,group=color)) + geom_line(aes(color=Replicate_no), size=0.5) + scale_color_d3(palette = "category20") +
+  geom_point(aes(y=OD,color=tech), size=1) + facet_wrap("compound") +  
+  scale_x_continuous(name = "Time (Hours)", limits = c(0,25)) + scale_y_continuous(name="bg corrected OD") + 
   th + theme_minimal()
 dev.off()
+#'H1','H2','H3','H4','H5','H6','H7','H8','H9','H10','H11','H12'
 
 
+############ QC: REMOVE NOISY WELLS
+# manually correct noise and try Re-fitting
+# 1.NT5021 (plate1-all replicates) - kept, didn't remove
+# 2.NT5022 (all)
+# 3.NT5023
 
+#read fitted values of models
+fit_params<-data.frame(read.table("GC_fit_params", header = TRUE, sep = '\t', stringsAsFactors = FALSE))
+head(fit_params)
+nrow(fit_params) #44,928 removed one replicate from 3 bugs, that's why numbers differ now
 
+fit_params_layout<-merge(plate_layout, fit_params, by=c("Bug_ID","Plate_no","col_name"))
+head(fit_params_layout)
 
-################### Quality control of fitted growth curves
+noisy_wells_handpicked<-data.frame(read.table("../noisy_wells", header = TRUE, sep = '\t', stringsAsFactors = FALSE))
+head(noisy_wells_handpicked)
+dim(noisy_wells_handpicked) #533
 
-View(fit_params_layout)
-fit_params_layout<-merge(fit_params_layout,bug_desc, by="Bug_ID")
-fit_params_layout$color<-paste0(fit_params_layout$Replicate_no,"_",fit_params_layout$tech)
+df1<-inner_join(fit_params_layout,noisy_wells_handpicked)
+View(df1)
+nrow(df1) #533
 
-#### Plot histogram of sigma values and pca of all params
-bugs<-unique(fit_params_layout$Bug_ID)
-bugs
+params_bugs_cmp_filtered<-anti_join(fit_params_layout,df1)
+nrow(params_bugs_cmp_filtered) #40,939
+head(params_bugs_cmp_filtered)
 
-outlier_wells_pca<-data.frame(stringsAsFactors = FALSE)
+params_bugs_cmp_filtered<-merge(params_bugs_cmp_filtered,bug_desc,by='Bug_ID')
+View(params_bugs_cmp_filtered)
+nrow(params_bugs_cmp_filtered) #40,939
 
-for(i in 1:length(bugs)){
-  
-  f<-fit_params_layout %>% filter(Bug_ID == bugs[i])
-  plates<-unique(f$Plate_no)
-  plates
-  
-  for(j in 1:length(plates)){
-    
-    p<-f %>% filter(Plate_no == plates[j])
-    head(p)
-    
-    reps<-unique(p$Replicate_no)
-    reps
-    
-    for(a in 1:length(reps)){
-      
-      r<- p %>% filter(Replicate_no == reps[a])
-      head(r)
-      
-      rownames(r)<-r$col_name
-      
-      CairoSVG(file=paste("../Figures/hist/", bugs[i], plates[j],"sigma.svg"), width = 8, height = 4, bg = "white")
-      print(p %>% dplyr::group_by(Bug_ID,Plate_no,compound,tech,Replicate_no) %>%
-              ggplot(aes(x=sigma)) + geom_histogram(aes(fill=tech),color="black", lwd=0.2) +
-              scale_fill_d3(palette = "category20") + facet_wrap("Replicate_no",scales = "free") +
-              ggtitle(paste(bugs[i],p$Sp_short,plates[j],sep=":")) +
-              th + theme_minimal())
-      dev.off()
-      
-      
-      pca.res <- prcomp(r %>% dplyr::select(k,n0,r,t_mid,t_gen,auc_l,auc_e,sigma), center=TRUE, scale=TRUE)
-      head(pca.res)
-      summary(pca.res)
-      
-      U<-pca.res$x
-      head(U)
-      
-      outliers_Ustd<-apply(U, 2, function(x) which( (abs(x - median(x)) / mad(x)) > 6 ))
-      outliers_Ustd
-      
-      if(length(outliers_Ustd) > 0){
-      
-      outs<-names(c(outliers_Ustd$PC1,outliers_Ustd$PC2))
-      outs<-unique(outs)
-      outs
-      
-      if(length(outs) > 0){
-        
-        for(z in 1:length(outs)){
-          
-          # str<-str_split(outs[z], "-")
-          # str
-          
-          outliers<-data.frame(Bug_ID = r$Bug_ID[1], Plate_no = r$Plate_no[1], 
-                               col_name = outs[z],
-                               Replicate_no = r$Replicate_no[1])
-          head(outliers)
-          
-          outlier_wells_pca<-rbind(outlier_wells_pca,outliers)
-          head(outlier_wells_pca)
-        }
-      }
-      
-      }
-      
-      df_pca<-as_tibble(list(PC1=pca.res$x[,1],
-                             PC2=pca.res$x[,2],
-                             samples = r$col_name))
-      df_pca
-    
-    
-      CairoSVG(file=paste("../Figures/pca/", bugs[i], plates[j],reps[a],"pca.svg"), width = 6, height = 4, bg = "white")
-      print(df_pca %>% ggplot(aes(x=PC1,y=PC2, label=samples)) +
-        geom_text(size = 3, aes(color=r$tech)) + scale_color_d3(palette = "category20") +
-        ggtitle(paste(bugs[i],r$Sp_short,plates[j],r$Replicate_no,sep=":")))
-      dev.off()
-      
-     
-    }
-    
-  }
-}
-
-nrow(outlier_wells_pca) #994
-View(outlier_wells_pca)
-
-# remove outliers (noisy) wells
-
-nrow(fit_params_layout) #41,472
-head(outlier_wells_pca)
-
-df1<-inner_join(fit_params_layout,outlier_wells_pca)
-nrow(df1) #994
-head(df1)
-
-fit_params_layout_filtered<-anti_join(fit_params_layout,df1)
-nrow(fit_params_layout_filtered) #40,478
-head(fit_params_layout_filtered)
-
-# mark outlier wells
-fit_params_layout_filtered$outlier<-'no'
-
-params_marked_outliers<-rbind(fit_params_layout_filtered,df1)
-params_marked_outliers<-params_marked_outliers[,c(1:6,13,16,20,23:27)]
-nrow(params_marked_outliers) #41,472
-View(params_marked_outliers)
-
-write.table(params_marked_outliers, file = "../Figures/outliers_marked_params", sep = "\t", quote = FALSE, row.names = FALSE)
-
-
-
-
-
-########################### correlation analysis between replicates (fitted OD values)
-fits<-read.table(file = "../Figures/fitted_values", header = TRUE, sep = '\t')
-head(fits)
-dim(fits)
-
-fits$time<-as.character(fits$time)
-
-mat_melt<-fits %>% reshape2::melt() %>% reshape(idvar = c("Bug_ID","Plate_no","col_name","compound","tech","Phyla","Species","Sp_short","time","variable"), timevar = c("Replicate_no"), direction = "wide")
-head(mat_melt)
-nrow(mat_melt)
-colnames(mat_melt)<-c("Bug_ID","Plate_no","col_name","compound","time","tech","Phyla","Species","Sp_short","variable","Rep2","Rep3","Rep1")
-
-#write.table(mat_melt, file = "/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/mat", sep = "\t", quote = FALSE, row.names = FALSE)
-
-#Select variable to compute correlation
-mat<-mat_melt %>% filter(variable == 'fitted')
-head(mat)
-nrow(mat) #232,272
-
-mat<-mat %>% filter(Bug_ID != 'NT5076')
-bugs<-unique(mat$Bug_ID)
-bugs
-
-correl_df<-data.frame(Bug_ID=character(),
-                      Plate_no=character(),
-                      comparisons=character(),
-                      value=double(),
-                      Parameter=character(),
-                      stringsAsFactors=FALSE)
-
-for(i in 1:length(bugs)){
-  
-  f<-mat %>% filter(Bug_ID == bugs[i])
-  head(f)
-  
-  plates<-unique(f$Plate_no)
-  plates
-  
-  for(j in 1:length(plates)){
-    
-    c<-f %>% filter(Plate_no == plates[j])
-    head(c)
-    c[ ,colSums(is.na(c)) == 0]
-    #c<-na.omit(c)
-    
-    #print(nrow(c))
-    Bug_ID<-c[1,1]
-    Bug_ID
-    Plate_no<-plates[j]
-    Plate_no
-    
-    d<-c %>% arrange(col_name,time)
-    head(d)
-    
-    select_numeric_columns<-d %>% select_if(., is.numeric)
-    select_numeric_columns
-    
-    correlations<-correlate(select_numeric_columns, method = "pearson")
-    correlations
-    corr<-reshape2::melt(correlations)
-    corr<-na.omit(corr)
-    corr
-    corr$comp<-paste(corr$term,corr$variable,sep = "-")
-    corr<-corr[,c(4,3)]
-    
-    combine_df<-cbind(data.frame(Bug_ID,Plate_no), corr)
-    print(combine_df)
-    correl_df<-rbind(correl_df, data.frame(combine_df))
-    
-  }
-  
-}
-
-head(correl_df)
-#
-corr_values<-correl_df
-head(corr_values)
-nrow(corr_values) #828
-corr_values<-corr_values %>% filter(!comp %in% c("Rep3-Rep2","Rep2-Rep1","Rep3-Rep1"))
-nrow(corr_values) #414
-
-head(corr_values)
-write.table(corr_values, file = paste0("../Figures/fittedOD_correl_pearson"), sep = "\t", quote = FALSE, row.names = FALSE)
-
-median_corr_bug_wise<-corr_values %>% dplyr::group_by(Bug_ID) %>%
-  dplyr::summarise(median_corr = median(value))
-
-View(median_corr_bug_wise)
-
-#write.table(median_corr_bug_wise, file = paste0("/Users/vinitaperiwal/GrowthCurver/median_correl_pearson"), sep = "\t", quote = FALSE, row.names = FALSE)
-
-all_bugs_desc<-merge(median_corr_bug_wise,bug_desc, by="Bug_ID")
-head(all_bugs_desc)
-
-all_bugs_corr_desc<-merge(corr_values,bug_desc, by="Bug_ID")
-head(all_bugs_corr_desc)
-
-coul <- brewer.pal(12, "PiYG")
-coul <- colorRampPalette(coul)(25)
-coul
-#plots colored histogram of all correlation values
-CairoSVG(file=paste("../Figures/fittedOD_correlation.svg", sep = ""), width = 7, height = 5, bg = "white")
-ggplot(all_bugs_corr_desc, aes(value)) + geom_histogram(aes(fill=Sp_short), color="black", lwd=0.2) + 
-  theme_bw() + th + scale_fill_igv() + scale_x_continuous(name = "correlation") +
-  guides(fill=guide_legend(title="Species"))
-dev.off()
-
-#plots median correlation values of plates of each bug
-CairoSVG(file=paste("../Figures/median_correlation.svg", sep = ""), width = 4, height = 4, bg = "white")
-all_bugs_desc %>% dplyr::group_by(Bug_ID,Sp_short) %>%
-  ggplot(aes(x=Sp_short,y=median_corr)) + geom_bar(stat = "identity") + theme_bw() + th +
-  theme(axis.text.x = element_text(angle = 90, size = 10, hjust = 1)) + scale_x_discrete(name = "Species")
-dev.off()
-
-
-
-
+# plot of auc_l vs auc_e
+params_bugs_cmp_filtered %>% group_by(Bug_ID,Sp_short,Replicate_no,Plate_no) %>% 
+  ggplot(aes(x=auc_l,y=auc_e)) + geom_point(aes(color=Plate_no), size=1) + geom_abline(lwd=0.1) + stat_cor() + theme_bw() +
+  scale_y_continuous(name = "Empirical AUC") + 
+  scale_x_continuous(name = "Logistic AUC") + scale_color_npg() + 
+  facet_wrap(~Sp_short, scales = "free") + th
 
 ############ 1. Normalization
 
-## control-based normalization
-
-#mean AUC of control wells
-control_wells<-params_bugs_cmp_filtered %>% filter(Compound == 'DMSO') %>% dplyr::group_by(Bug_ID,Replicate_no,Plate_no) %>%
-  summarise(median_auc_control_wells = median(auc_l))
-View(control_wells)
-nrow(control_wells) #298 out of 300
-
-##### normalizing each well by plate controls
-
-# merge controls auc
-params_bugs_cmp_auc<-merge(params_bugs_cmp_filtered,control_wells,by=c("Bug_ID","Replicate_no","Plate_no"))
-nrow(params_bugs_cmp_auc) #27,999
-head(params_bugs_cmp_auc)
-
-# merge technical replicates
-#techs_auc<-params_bugs_cmp_auc %>% dplyr::group_by(Bug_ID,Plate_no,Replicate_no,Compound,Species,Sp_short,Phyla,median_auc_control_wells) %>%
-#  summarise(avg_auc = median(auc_l))
-
-#View(techs_auc)
-#nrow(techs_auc) #9046
-
-#length(unique(techs_auc$Compound))
-
-# normalize each well
-normAUCl_control<-params_bugs_cmp_auc %>% dplyr::group_by(Bug_ID,Replicate_no,Plate_no,Compound,Phyla,Species,Sp_short,col_name) %>% 
-  mutate(cnormAUC = round((auc_l/median_auc_control_wells), digits = 3))
-head(normAUCl_control)
-nrow(normAUCl_control) #27,999
-
-write.table(normAUCl_control, file = "/Users/periwal/ShikiFactory/WP3/SW_SF100/GrowthProfiler/cnormAUCs", sep = "\t", quote = FALSE, row.names = FALSE)
-
-## read normAUCl
-normAUCl_control<-data.frame(read.table("/Users/periwal/ShikiFactory/WP3/SW_SF100/GrowthProfiler/cnormAUCs", header = TRUE, sep = '\t', stringsAsFactors = FALSE))
-
-## all runs normAUC_control
-#CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/cnormAUC.svg", sep = ""), width = 10, height = 4, bg = "white")
-#normAUCl_control %>% dplyr::group_by(Bug_ID,Replicate_no) %>%
-#  ggplot(aes(x=Sp_short,y=cnormAUC)) + geom_boxplot(aes(fill = Plate_no), outlier.size = 0.01, lwd=0.15) +
-#  theme_minimal() + th + scale_fill_npg() 
-#dev.off()
-
-CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/cnormAUC_galch.svg", sep = ""), width = 8, height = 5, bg = "white")
-normAUCl_control %>% filter(Plate_no == 'Plate1-GALCH') %>% dplyr::group_by(Bug_ID,Plate_no,Replicate_no) %>%
-  ggplot(aes(cnormAUC)) + geom_density(aes(fill=Replicate_no,color=Replicate_no), alpha=0.3) +
-  facet_wrap("Sp_short", scales = "free") +
-  scale_fill_npg() + scale_color_npg() + th + theme_bw()
-dev.off()
-
-###################### boxplot of effect of comb drugs alone (compared with bug alone)
-View(normAUCl_control)
-
-normAUCl_control_asp<-normAUCl_control
-
-for(i in 1:nrow(normAUCl_control_asp)){
-  
-  line = normAUCl_control[i,]
-  #print(line)
-  
-  if(line$Compound == 'Aspartame' & line$col_name %in% c('H7','H8','H9','H10','H11','H12')){
-    
-    #line$Compound<-'DMSO'
-    normAUCl_control_asp[i,]$Compound<-'Asp'
-    
-  }
-}
-
-View(normAUCl_control_asp)
-
-SF_drugs_bugs<-normAUCl_control_asp %>% dplyr::group_by(Bug_ID,Plate_no,Replicate_no) %>% filter(Compound %in% c("Vanillin","Caffeine","Asp","Duloxetine") & !Plate_no %in% c('Plate1-GALCH','Plate2-Comm') & !col_name %in% c('D11','D12')) %>%
-  dplyr::group_by(Bug_ID,Plate_no,Replicate_no,Species,Compound,Sp_short) %>% summarise(av_aucD = median(cnormAUC))
-View(SF_drugs_bugs)
-nrow(SF_drugs_bugs) #150
-
-CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/comb.svg", sep = ""), width = 13, height = 5, bg = "white")
-SF_drugs_bugs %>% dplyr::group_by(Bug_ID) %>% 
-  ggplot(aes(x=Sp_short,y=av_aucD)) + geom_boxplot(aes(fill = Plate_no),lwd=0.15) + geom_point(position=position_dodge2(width = 0.8),aes(fill = Plate_no), shape=21) +
-  facet_grid(c("Compound","Bug_ID"), scales = "free") +  th + scale_fill_npg() + scale_color_npg() + scale_x_discrete(name = "Species") +
-  scale_y_continuous(name = "normalized AUC")
-dev.off()
-
-##### plate-based normalization (robust z-score)
-# params_bugs_cmp_filtered<-read.table("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/pca_filtered", header = TRUE, sep = '\t')
-# head(params_bugs_cmp_filtered)
-#  
-# # #remove control wells from median calculations
-# normAUCl_z<-params_bugs_cmp_filtered %>% dplyr::group_by(Bug_ID,Plate_no,Replicate_no) %>% filter(!Compound == 'DMSO') %>%
-#    summarise(pl_med = median(auc_l), mean_ab_dev = mad(auc_l))
-# head(normAUCl_z)
-#  
-# normAUCl_plate<-merge(params_bugs_cmp_filtered,normAUCl_z,by=c('Bug_ID','Plate_no','Replicate_no'))
-# head(normAUCl_plate)
+# ## control-based normalization
 # 
-# normAUCl_plate<-normAUCl_plate %>% dplyr::group_by(Bug_ID,Plate_no,Replicate_no,col_name) %>% filter(!Compound == 'DMSO') %>%
-#   mutate(zscoreAUC = (auc_l-pl_med)/mean_ab_dev)
-# head(normAUCl_plate)
+# #mean AUC of control wells
+# control_wells<-fit_params_layout %>% filter(compound == 'DMSO') %>% dplyr::group_by(Bug_ID,Replicate_no,Plate_no) %>%
+#   summarise(median_auc_control_wells = median(auc_l))
+# View(control_wells)
+# nrow(control_wells) #432
 # 
-# CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/zscoreAUC_Plate1.svg", sep = ""), width = 8, height = 5, bg = "white")
-# normAUCl_plate %>% filter(Plate_no == 'Plate1-GALCH') %>% dplyr::group_by(Bug_ID,Plate_no,Replicate_no) %>%
-#   ggplot(aes(zscoreAUC)) + geom_density(aes(fill=Replicate_no,color=Replicate_no), alpha=0.3) +
+# ##### normalizing each well by plate controls
+# 
+# # merge controls auc
+# params_bugs_cmp_auc<-merge(fit_params_layout,control_wells,by=c("Bug_ID","Replicate_no","Plate_no"))
+# nrow(params_bugs_cmp_auc) #27,999
+# head(params_bugs_cmp_auc)
+# 
+
+# # normalize each well
+# normAUCl_control<-params_bugs_cmp_auc %>% dplyr::group_by(Bug_ID,Replicate_no,Plate_no,compound,tech,Phyla,Species,Sp_short,col_name) %>% 
+#   mutate(cnormAUC = round((auc_l/median_auc_control_wells), digits = 3))
+# head(normAUCl_control)
+# nrow(normAUCl_control) #27,999
+# 
+# write.table(normAUCl_control, file = "../cnormAUCs", sep = "\t", quote = FALSE, row.names = FALSE)
+# 
+# ## read normAUCl
+# normAUCl_control<-data.frame(read.table("../cnormAUCs", header = TRUE, sep = '\t', stringsAsFactors = FALSE))
+# 
+# ## all runs normAUC_control
+# #CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/cnormAUC.svg", sep = ""), width = 10, height = 4, bg = "white")
+# #normAUCl_control %>% dplyr::group_by(Bug_ID,Replicate_no) %>%
+# #  ggplot(aes(x=Sp_short,y=cnormAUC)) + geom_boxplot(aes(fill = Plate_no), outlier.size = 0.01, lwd=0.15) +
+# #  theme_minimal() + th + scale_fill_npg() 
+# #dev.off()
+# 
+# CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/cnormAUC_galch.svg", sep = ""), width = 8, height = 5, bg = "white")
+# normAUCl_control %>% filter(Plate_no == 'plate1') %>% dplyr::group_by(Bug_ID,Plate_no,Replicate_no) %>%
+#   ggplot(aes(cnormAUC)) + geom_density(aes(fill=Replicate_no,color=Replicate_no), alpha=0.3) +
 #   facet_wrap("Sp_short", scales = "free") +
 #   scale_fill_npg() + scale_color_npg() + th + theme_bw()
 # dev.off()
 # 
-#CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/WP3_zscoreAUC.svg", sep = ""), width = 11, height = 3, bg = "white")
-#normAUCl_plate %>% filter(Plate_no %in% c('Plate1-GALCH','Plate2-Comm')) %>% dplyr::group_by(Bug_ID,Plate_no,Replicate_no) %>%
-#  ggplot(aes(zscoreAUC)) + geom_density(aes(fill=Replicate_no,color=Replicate_no), alpha=0.3) +
-#  facet_grid("Plate_no ~ Sp_short", scales = "free") +
-#  scale_fill_npg() + scale_color_npg() + th + theme_bw()
-#dev.off()
 
-# ###################### boxplot of effect of comb drugs alone (compared with bug alone)
-# 
-# SF_drugs_bugs<-normAUCl_plate %>% dplyr::group_by(Bug_ID,Plate_no,Replicate_no) %>% filter(Compound %in% c("Vanillin","Caffeine","Aspartame","Duloxetine") & !Plate_no %in% c('Plate1-GALCH','Plate2-Comm')) %>%
-#   dplyr::group_by(Bug_ID,Replicate_no,Species,Compound,Sp_short) %>% summarise(av_aucD = median(zscoreAUC))
-# View(SF_drugs_bugs)
-# nrow(SF_drugs_bugs) #120
-# 
-# CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/zscomb.svg", sep = ""), width = 10, height = 4, bg = "white")
-# SF_drugs_bugs %>% dplyr::group_by(Bug_ID) %>% 
-#   ggplot(aes(x=Bug_ID,y=av_aucD)) + geom_boxplot(aes(fill = Compound),lwd=0.15) + geom_point(position=position_dodge2(width = 0.8),aes(fill = Compound), shape=21) +
-#   facet_wrap("Sp_short", scales = "free",ncol = 5) + theme_minimal() + th + scale_fill_npg() + scale_color_npg() + 
-#   scale_y_continuous(name = "normalized AUC") + coord_flip() + theme(axis.text.y = element_blank(), axis.title.y = element_blank())
-# dev.off()
 
+##### plate-based normalization (robust z-score)
+# 1. for single compounds - using plate median
+# 2. for combinations - using controls
+
+View(params_bugs_cmp_filtered)
+
+params<-params_bugs_cmp_filtered[,c(1:6,23,25,20)]
+dim(params) #40,939 X 9
+
+# #using plate median for p1 plates
+normAUCl_z<-params %>% dplyr::group_by(Bug_ID,Plate_no,Replicate_no,Phyla,Sp_short) %>%
+   mutate(pl_med = median(auc_l), mad_pl = mad(auc_l))
+head(normAUCl_z)
+dim(normAUCl_z)
+
+cnormAUCl_z<-normAUCl_z %>% filter(compound == 'DMSO') %>% dplyr::group_by(Bug_ID,Plate_no,Replicate_no,Phyla,Sp_short) %>%
+  summarise(ctrl_mean = mean(auc_l), std_ctrl = std(auc_l))
+head(cnormAUCl_z)
+dim(cnormAUCl_z)
+
+normAUCl_z<-merge(normAUCl_z,cnormAUCl_z,by=c("Bug_ID","Replicate_no","Plate_no","Phyla","Sp_short"))
+dim(normAUCl_z)
+View(normAUCl_z)
+
+znormAUCs<-normAUCl_z %>% dplyr::group_by(Bug_ID,Plate_no,Replicate_no,col_name) %>%
+  mutate(pzscoreAUC = (auc_l-pl_med)/mad_pl, czscoreAUC = (auc_l-ctrl_mean)/std_ctrl, FC = auc_l/ctrl_mean) #FC treatment vs control
+
+View(znormAUCs %>% filter(Plate_no == 'plate1'))
+
+write.table(znormAUCs, file = "../Figures/znormAUCs", sep = '\t', row.names = FALSE)
+
+# plotting density of normalized wells
+CairoSVG(file=paste("../Figures/zscoreAUC.svg", sep = ""), width = 8, height = 5, bg = "white")
+znormAUCs %>%  dplyr::group_by(Bug_ID,Plate_no,Replicate_no) %>% filter(Plate_no != 'plate1') %>%
+  ggplot(aes(czscoreAUC)) + geom_density(aes(fill=Replicate_no,color=Replicate_no), alpha=0.3, lwd=0.3) +
+  facet_wrap("Sp_short", scales = "free") +
+  scale_fill_jama() + scale_color_jama() + th + theme_bw()
+
+dev.off()
+
+# plot of control and plate normalized AUCs
+znormAUCs %>% group_by(Bug_ID,Sp_short,Replicate_no,Plate_no) %>% 
+  ggplot(aes(x=czscoreAUC,y=pzscoreAUC)) + geom_point(aes(color=Plate_no), size=1) + geom_abline(lwd=0.1) + stat_cor() + 
+  scale_y_continuous(name = "ctrl norm AUC") + 
+  scale_x_continuous(name = "pl norm AUC") + scale_color_npg() + 
+  facet_grid(c('Plate_no','Sp_short'), scales = "free") + th + theme_bw()
 
 
 ######## 2. Hit selection (unpaired (unequal no of observations) t-test / welch two sample t-test)
+znormAUCs<-read.table(file = "../Figures/znormAUCs", header = TRUE, stringsAsFactors = FALSE)
+dim(znormAUCs)
+View(znormAUCs)
 
-View(normAUCl_plate)
-
-#head(normAUCl_plate)
-#var<-normAUCl_control %>% dplyr::group_by(Bug_ID,Plate_no,Replicate_no) %>% 
-#  do(unpairedT_pval(.))
-
-#View(var)
-
-hits<-normAUCl_control %>% dplyr::group_by(Bug_ID,Plate_no,Replicate_no) %>% 
+# t-test bug wise and replicate wise
+hits_BR<-znormAUCs %>% dplyr::group_by(Bug_ID, Plate_no, Replicate_no) %>% 
   do(unpairedT_pval(.))
-View(hits)
-nrow(hits) #12,171
+View(hits_BR)
+nrow(hits_BR) #17,182
 
+hits_BR_noDMSO<-hits_BR %>% filter(compound != 'DMSO')
 
-CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/pval_dist.svg", sep = ""), width = 3, height = 2, bg = "white")
-hits %>% ggplot(aes(x=pv)) + geom_histogram(color="white",fill="#4d4d4d",bins = 30,lwd=0.1) + th
+CairoSVG(file=paste("../Figures/pval_dist.svg", sep = ""), width = 3, height = 2, bg = "white")
+hits_BR_noDMSO %>% ggplot(aes(x=pv)) + geom_histogram(color="white",fill="#4d4d4d",bins = 30,lwd=0.1) + th
 dev.off()
 
-#### combining p values across replicates using fisher's method
+View(hits_BR_noDMSO)
+# #### combining p values across replicates using fisher's (combined_pval)
+pooled_es<-hits_BR_noDMSO %>% dplyr::group_by(Bug_ID,Plate_no,compound,Phyla,Sp_short) %>% do(pool_es(.))
+head(pooled_es)
+nrow(pooled_es)
 
-combined_pval<-hits %>% dplyr::group_by(Bug_ID,Plate_no,Compound,Phyla,Species,Sp_short) %>%
-  summarise(combined_pv = sumlog(pv)[["p"]], count = length(pv))
-View(combined_pval)
-nrow(combined_pval) #4247
+combined_pval<-hits_BR_noDMSO %>% dplyr::group_by(Bug_ID,Plate_no,compound,Phyla,Sp_short) %>% 
+  summarise(combined_pv = sumlog(pv)[["p"]], count = length(pv), l2FC = log2(median(avFC))) #log 2 of geometric mean of replicates
 
-sig_hits<-combined_pval %>% filter(combined_pv < 0.01 & count > 2 & Plate_no %in% c('Plate1-GALCH','Plate2-Comm'))
-head(sig_hits)
-nrow(sig_hits) #280
+es_pv_l2fc<-merge(pooled_es, combined_pval, by=c('Bug_ID','Plate_no','compound','Phyla','Sp_short'))
+nrow(es_pv_l2fc) #5,925
 
-CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/pval_combined.svg", sep = ""), width = 5, height = 2.3, bg = "white")
-sig_hits %>% ggplot(aes(combined_pv)) + geom_histogram(aes(fill=Plate_no),color="white",lwd=0.1) + 
-  th + scale_fill_lancet()
-dev.off()
+View(es_pv_l2fc)
+
 
 ### multiple hypotheses testing: error correction
-
-p_bh<-combined_pval %>% dplyr::group_by(Bug_ID,Plate_no) %>%
+p_bh<-es_pv_l2fc %>% dplyr::group_by(Bug_ID,Plate_no) %>%
   mutate(p_bh = p.adjust(combined_pv,method = "BH"))
 View(p_bh)
-nrow(p_bh)
+nrow(p_bh) #5925
 
-hits_bh<-p_bh %>% filter(p_bh < 0.01 & Plate_no %in% c('Plate1-GALCH','Plate2-Comm'))
-nrow(hits_bh) #232
-head(hits_bh)
-
-CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/pval_bh.svg", sep = ""), width = 5, height = 2, bg = "white")
-hits_bh %>% ggplot(aes(p_bh)) + geom_histogram(aes(fill=Plate_no)) + 
-  th + scale_fill_lancet()
+hits<-p_bh %>% filter(l2FC != '-Inf' & Plate_no == 'plate1')
+nrow(hits) #1,048
+CairoSVG(file=paste("../Figures/volcano_reps.svg", sep = ""), width = 10, height = 10, bg = "white")
+EnhancedVolcano(hits,
+                lab = hits$compound,
+                x = 'l2FC',
+                y = 'p_bh',
+                pCutoff = 0.05,
+                FCcutoff = 0.15,
+                legendPosition = 'bottom',
+                labSize = 4
+ )
 dev.off()
 
-#galch
-CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/p_bh_GALCH_heatmap.svg", sep = ""), width = 3.5, height = 7, bg = "white")
-hits_bh %>% filter(Plate_no == "Plate1-GALCH") %>% ggplot(aes(x=Sp_short,y=Compound)) + geom_tile(aes(fill=as.character(count)), color = "white", lwd = 0.1) + theme_bw() +
+CairoSVG(file=paste("../Figures/heatmap_reps.svg", sep = ""), width = 4, height =6, bg = "white")
+hits %>% filter(p_bh < 0.05 & (l2FC > 0.3 | l2FC < -0.3)) %>% ggplot(aes(x=Sp_short,y=compound)) + geom_tile(aes(fill=l2FC), color = "white", lwd = 0.1) + theme_bw() +
+     th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), panel.grid = element_blank()) +
+     scale_fill_gradientn(colours = wes_palette("Zissou1", 100, type = "continuous"))
+dev.off()
+
+hits %>% ggplot(aes(x=l2FC)) + geom_density()
+
+
+head(hits)
+
+sig_p<-hits %>% filter(p_bh < 0.05 & l2FC > 0)
+nrow(sig_p)
+head(sig_p)
+
+
+sig_p %>% ggplot(aes(x=l2FC)) + geom_histogram(binwidth = 0.01,stat = 'bin')  + scale_x_continuous(breaks = seq(-1.5,1.5,by=0.05))
+
+
+ggplot(sig_p, aes(x=l2FC)) + 
+  stat_ecdf(geom = 'point') + scale_x_continuous(breaks = seq(-1.5,1.5,by=0.05))
+
+
+nrow(h) #44
+View(h)
+
+## combination compounds
+comb<-p_bh %>% filter(l2FC != '-Inf' & compound %in% c('Advantame-comb','Caffeine','Duloxetine','Vanillin','Cetrizine','Risperidone','Ethinylestradiol','Ranitidine','Montelukast','Acetaminophen','Aripirazole','Ibuprofen'))
+View(comb)
+EnhancedVolcano(comb,
+                lab = comb$compound,
+                x = 'l2FC',
+                y = 'p_bh',
+                pCutoff = 0.05,
+                FCcutoff = 0.15,
+                legendPosition = 'bottom',
+                labSize = 4
+)
+comb %>% filter(p_bh < 0.05 & (l2FC > 0.15 | l2FC < -0.15)) %>% ggplot(aes(x=Sp_short,y=compound)) + geom_tile(aes(fill=l2FC), color = "white", lwd = 0.1) + theme_bw() +
   th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), panel.grid = element_blank()) +
-  scale_fill_nejm(name = "#Reps") + scale_y_discrete(name = "Compound") 
-dev.off()
-
-#commercial
-CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/p_bh_Comm_heatmap.svg", sep = ""), width = 5, height = 7, bg = "white")
-hits_bh %>% filter(Plate_no == "Plate2-Comm") %>% ggplot(aes(x=Sp_short,y=Compound)) + geom_tile(aes(fill=as.character(count)), color = "white", lwd = 0.1) + theme_bw() +
-  th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), panel.grid = element_blank()) + 
-  scale_fill_nejm(name = "#Reps") + scale_y_discrete(name = "Compound") 
-dev.off()
-  
-#combination compound effect
-CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/comb_effect.svg", sep = ""), width = 5, height = 3, bg = "white")
-p_bh %>% filter(p_bh < 0.05 & Compound %in% c("Vanillin","Caffeine","Asp","Duloxetine")) %>% ggplot(aes(x=Sp_short,y=Compound)) + 
-  geom_point(aes(fill=Plate_no), shape=21, position = position_dodge2(width = 0.5)) + theme_bw() +
-  th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank()) + 
-  scale_fill_aaas() + scale_y_discrete(name = "Compound") 
-dev.off()
+  scale_fill_gradientn(colours = wes_palette("Zissou1", 100, type = "continuous"))
 
 
-# combinations
-CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/comb_effect_galch.svg", sep = ""), width = 8.5, height = 7, bg = "white")
-p_bh %>% filter(p_bh < 0.05 & Plate_no %in% c('Plate1-GALCH','Plate1+A','Plate1+C','Plate1+D','Plate1+V')) %>% ggplot(aes(x=Sp_short,y=Compound)) + 
-  geom_point(aes(fill=as.character(count)), shape=21) + theme_bw() +
-  th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), axis.title.x = element_blank()) + 
-  scale_fill_aaas(name = "#Reps") + scale_y_discrete(name = "Compound") +
-  facet_grid(~Plate_no)
-dev.off()
 
 
-CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/advan_effect.svg", sep = ""), width = 10, height = 4, bg = "white")
-p_bh %>% filter(p_bh < 0.05 & Plate_no %in% c('Plate2-Comm','Plate2+A','Plate2+C','Plate2+D','Plate2+V') & !Compound %in% c("Vanillin","Caffeine","Asp","Duloxetine") & Compound %in% c('Advantame','Aspartame')) %>% ggplot(aes(x=Sp_short,y=Compound)) + 
-  geom_point(aes(fill=as.character(count)), shape=21) + theme_bw() +
-  th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), axis.title.x = element_blank()) + 
-  scale_fill_aaas(name = "#Reps") + scale_y_discrete(name = "Compound") +
-  facet_grid(~Plate_no)
-dev.off()
+hits %>% filter(pval_es < 0.05 & (pooled_effect > 3 | pooled_effect < -3)) %>% dplyr::group_by(Bug_ID,Sp_short,compound) %>%
+  ggplot(aes(x=pooled_effect,y=compound)) + geom_errorbar(aes(xmin = low.ci, xmax = high.ci, color=Bug_ID)) + geom_point(aes(color=Bug_ID)) +
+  scale_color_igv() + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), axis.title = element_blank(),legend.position = "bottom") +
+  facet_grid(~Sp_short, scales = "free") + th
 
 
+
+
+
+# plot of control and plate normalized AUCs
+hits %>% filter(combined_pv < 0.05) %>% group_by(Bug_ID,Sp_short,Plate_no) %>% 
+  ggplot(aes(x=l2FC,y=pooled_effect)) + geom_point(aes(color=combined_pv), size=1) + geom_abline(lwd=0.1) + stat_cor() + 
+  scale_y_continuous(name = "pooled effect") + 
+  scale_x_continuous(name = "l2FC") + scale_color_continuous() + 
+  facet_wrap(c('Sp_short'), scales = "free") + th + theme_bw()
+
+# t-test bug wise
+# hits_B<-znormAUCs %>% filter(Plate_no == 'plate1') %>% dplyr::group_by(Bug_ID) %>% 
+#   do(unpairedT_pval_FC(.))
+# View(hits_B)
+# nrow(hits_B) #1,075
+# 
+# hits_B_noDMSO<-hits_B %>% filter(compound != 'DMSO')
+# 
+# CairoSVG(file=paste("../Figures/pval_dist.svg", sep = ""), width = 3, height = 2, bg = "white")
+# hits_B_noDMSO %>% ggplot(aes(x=pv)) + geom_histogram(color="white",fill="#4d4d4d",bins = 30,lwd=0.1) + th
+# dev.off()
+# 
+# View(hits_B_noDMSO)
+# # # #### combining p values across replicates using fisher's (combined_pval)
+# # combined_pval<-hits_B_noDMSO %>% dplyr::group_by(Bug_ID,Plate_no,compound,Phyla,Sp_short) %>%
+# #   summarise(combined_pv = sumlog(pv)[["p"]], count = length(pv), l2FC = log2(exp(mean(log(avFC))))) #log 2 of geometric mean of replicates
+# # 
+# # View(combined_pval) #1,050
+# 
+# ### multiple hypotheses testing: error correction
+# p_bh_B<-hits_B_noDMSO %>% dplyr::group_by(Bug_ID,Plate_no) %>%
+#   mutate(p_bh = p.adjust(pv,method = "BH"))
+# View(p_bh_B)
+# nrow(p_bh_B) #1050
+# 
+# hits_B<-p_bh_B %>% filter(l2FC != '-Inf')
+# View(hits_B)
+# CairoSVG(file=paste("../Figures/volcano_reps.svg", sep = ""), width = 10, height = 10, bg = "white")
+# EnhancedVolcano(hits_B,
+#                 lab = hits_B$compound,
+#                 x = 'l2FC',
+#                 y = 'p_bh',
+#                 pCutoff = 0.05,
+#                 FCcutoff = 0.31,
+#                 legendPosition = 'bottom',
+#                 labSize = 4
+# )
+# dev.off()
+# 
+# CairoSVG(file=paste("../Figures/heatmap_reps.svg", sep = ""), width = 7, height = 8, bg = "white")
+# hits_B %>% filter(p_bh < 0.05 & (l2FC > 0.31 | l2FC < -0.31)) %>% ggplot(aes(x=Sp_short,y=compound)) + geom_tile(aes(fill=l2FC), color = "white", lwd = 0.1) + theme_bw() +
+# th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), panel.grid = element_blank()) +
+#   scale_fill_gradientn(colours = wes_palette("Zissou1", 100, type = "continuous"))
+# dev.off()
+# 
+# nrow(h_B) #63
+# View(h_B)
+# 
+# 
+# 
+
+# hits_BPR_noDMSO %>% ggplot(aes(x=Sp_short,y=compound)) + geom_tile(aes(fill=as.character(avFC)), color = "white", lwd = 0.1) + theme_bw() +
+#   th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), panel.grid = element_blank()) +
+#   scale_fill_nejm(name = "#Reps") + scale_y_discrete(name = "Compound") 
+
+
+# #### combining p values across replicates using fisher's method
+# dim(hits_noDMSO)
+# head(hits_noDMSO)
+# 
+# combined_pval<-hits %>% dplyr::group_by(Bug_ID,Plate_no,compound,Phyla,Sp_short) %>%
+#   summarise(combined_pv = sumlog(pv)[["p"]], count = length(pv))
+# View(combined_pval)
+# nrow(combined_pval) #5,925
+# 
+# sig_hits<-combined_pval %>% filter(combined_pv < 0.01 & Plate_no == 'plate1')
+# View(sig_hits)
+# nrow(sig_hits) #465
+# 
+# CairoSVG(file=paste("../Figures/pval_combined.svg", sep = ""), width = 4, height = 2.3, bg = "white")
+# sig_hits %>% ggplot(aes(combined_pv)) + geom_histogram(aes(fill=Plate_no),color="white",lwd=0.1) + 
+#   th + scale_fill_lancet()
+# dev.off()
+
+# ### multiple hypotheses testing: error correction
+# 
+# p_bh<-combined_pval %>% dplyr::group_by(Bug_ID,Plate_no) %>%
+#   mutate(p_bh = p.adjust(combined_pv,method = "BH"))
+# View(p_bh)
+# nrow(p_bh)
+# 
+# hits_bh<-p_bh %>% filter(p_bh < 0.01 & Plate_no == 'plate1')
+# nrow(hits_bh) #376
+# head(hits_bh)
+# 
+# CairoSVG(file=paste("../Figures/pval_bh.svg", sep = ""), width = 4, height = 2, bg = "white")
+# hits_bh %>% ggplot(aes(p_bh)) + geom_histogram(aes(fill=Plate_no)) + 
+#   th + scale_fill_lancet()
+# dev.off()
+# 
+
+
+# #plate1
+# CairoSVG(file=paste("../Figures/p_bh_plate1_heatmap.svg", sep = ""), width = 7, height = 7, bg = "white")
+# hits %>% ggplot(aes(x=Sp_short,y=compound)) + geom_tile(aes(fill=as.character(count)), color = "white", lwd = 0.1) + theme_bw() +
+#   th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), panel.grid = element_blank()) +
+#   scale_fill_nejm(name = "#Reps") + scale_y_discrete(name = "Compound") 
+# dev.off()
+#   
+# 
+# 
+# # combinations
+# CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/comb_effect_galch.svg", sep = ""), width = 8.5, height = 7, bg = "white")
+# p_bh %>% filter(p_bh < 0.05 & Plate_no %in% c('Plate1-GALCH','Plate1+A','Plate1+C','Plate1+D','Plate1+V')) %>% ggplot(aes(x=Sp_short,y=Compound)) + 
+#   geom_point(aes(fill=as.character(count)), shape=21) + theme_bw() +
+#   th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), axis.title.x = element_blank()) + 
+#   scale_fill_aaas(name = "#Reps") + scale_y_discrete(name = "Compound") +
+#   facet_grid(~Plate_no)
+# dev.off()
 
 
 # pooled effect sizes (all replicates)
+View(hits_noDMSO)
 
-pooled_hits<-hits %>% dplyr::group_by(Bug_ID,Plate_no,Compound,Phyla,Species,Sp_short) %>% 
+# non-pooled effect sizes
+# CairoSVG(file=paste("../Figures/non_pooled_esgreat_plate1.svg", sep = ""), width = 17, height = 8, bg = "white")
+# hits_noDMSO %>% dplyr::group_by(Bug_ID,Plate_no,compound) %>% mutate(count = length(pv)) %>% filter(Plate_no == 'plate1' & pv < 0.01 & count >= 2) %>% dplyr::group_by(Bug_ID,Sp_short,compound) %>%
+#   ggplot(aes(x=es,y=compound)) + geom_errorbar(aes(xmin = lci, xmax = uci, color=Bug_ID)) + geom_point(aes(color=Bug_ID),size=0.1) +
+#   scale_color_igv() + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), axis.title = element_blank(),legend.position = "bottom") +
+#   facet_grid(~Sp_short, scales = "free") + th
+# dev.off()
+
+pooled_hits<-hits %>% dplyr::group_by(Bug_ID,Plate_no,compound,Phyla,Sp_short) %>% 
   do(pool_es(.))
 head(pooled_hits)
+nrow(pooled_hits)
 View(pooled_hits)
 
-
-pooled_hits %>% filter(Plate_no == "Plate1-GALCH") %>% dplyr::group_by(Bug_ID,Sp_short,Compound) %>%
-  ggplot(aes(x=Sp_short,y=Compound)) + geom_tile(aes(fill=pooled_effect),color="#000000") +
-  scale_fill_distiller(palette = "RdGy") + th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), panel.grid = element_blank(), axis.title = element_blank())
-
-sig_hits<-pooled_hits %>% filter(pval_es < 0.05)
+sig_hits<-pooled_hits %>% filter(pval_es < 0.05 & Plate_no == 'plate1' & compound == 'Saccharin')
 View(sig_hits)
-nrow(sig_hits) # 279
-
-pooled_hits_monica_GALCH<-pooled_hits %>% filter(Plate_no == "Plate1-GALCH")
-pooled_hits_monica_GALCH<-pooled_hits_monica_GALCH[,c(1:10)]
-View(pooled_hits_monica_GALCH)
-nrow(pooled_hits_monica_GALCH) #420 (42 compounds x 10 bugs)
-
-write.csv(pooled_hits_monica_GALCH, file = "galch_es_10_bugs.csv", row.names = FALSE)
+nrow(sig_hits) #180
 
 
-CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/sig_GALCH.svg", sep = ""), width = 10, height = 6, bg = "white")
-sig_hits %>% filter(Plate_no == "Plate1-GALCH") %>% dplyr::group_by(Bug_ID,Sp_short,Compound) %>%
-  ggplot(aes(x=pooled_effect,y=Compound)) + geom_errorbar(aes(xmin = low.ci, xmax = high.ci, color=Bug_ID)) + geom_point(aes(color=Bug_ID)) +
-  scale_color_npg() + th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), panel.grid = element_blank(), axis.title = element_blank()) +
-  facet_grid(~Sp_short, scales = "free")
+CairoSVG(file=paste("../Figures/pooled_es_plate1.svg", sep = ""), width = 16, height = 8, bg = "white")
+sig_hits  %>% dplyr::group_by(Bug_ID,Sp_short,compound) %>%
+  ggplot(aes(x=pooled_effect,y=compound)) + geom_errorbar(aes(xmin = low.ci, xmax = high.ci, color=Bug_ID)) + geom_point(aes(color=Bug_ID)) +
+  scale_color_igv() + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), axis.title = element_blank(),legend.position = "bottom") +
+  facet_grid(~Sp_short, scales = "free") + th
 dev.off()
 
 
-CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/sig_Comm.svg", sep = ""), width = 10, height = 6, bg = "white")
-sig_hits %>% filter(Plate_no == "Plate2-Comm") %>% dplyr::group_by(Bug_ID,Sp_short,Compound) %>%
-  ggplot(aes(x=pooled_effect,y=Compound)) + geom_errorbar(aes(xmin = low.ci, xmax = high.ci, color=Bug_ID)) + geom_point(aes(color=Bug_ID)) +
-  scale_color_npg() + th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), panel.grid = element_blank(), axis.title = element_blank()) +
-  facet_grid(~Sp_short, scales = "free")
+com_cmp<-pooled_hits %>% filter(compound %in% c('Advantame-comb','Caffeine','Duloxetine','Vanillin') & pval_es < 0.05)
+CairoSVG(file=paste("../Figures/pooled_es_comb.svg", sep = ""), width = 16, height = 3.5, bg = "white")
+com_cmp  %>% dplyr::group_by(Bug_ID,Sp_short,compound) %>%
+  ggplot(aes(x=pooled_effect,y=compound)) + geom_errorbar(aes(xmin = low.ci, xmax = high.ci, color=Bug_ID)) + geom_point(aes(color=Bug_ID)) +
+  scale_color_igv() + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), axis.title = element_blank(),legend.position = "bottom") +
+  facet_grid(~Sp_short, scales = "free") + th
 dev.off()
 
 
-sig_hits %>% filter(Plate_no == "Plate1-GALCH") %>% dplyr::group_by(Bug_ID,Sp_short,Compound) %>%
-  ggplot(aes(x=pooled_effect,y=Compound)) + geom_errorbar(aes(xmin = low.ci, xmax = high.ci, color=Bug_ID)) + geom_point(aes(color=Bug_ID)) +
-  scale_color_npg() + th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), panel.grid = element_blank(), axis.title = element_blank()) +
-  facet_grid(~Sp_short, scales = "free")
+View(com_cmp)
 
+#plate6
+plate6<-pooled_hits %>% filter(pval_es < 0.05 & Plate_no == 'plate6')
+View(plate6)
+nrow(plate6)
 
-sig_hits %>% filter(Plate_no == "Plate2+D") %>% dplyr::group_by(Bug_ID,Sp_short,Compound) %>%
-  ggplot(aes(x=pooled_effect,y=Compound)) + geom_errorbar(aes(xmin = low.ci, xmax = high.ci, color=Bug_ID)) + geom_point(aes(color=Bug_ID)) +
-  scale_color_npg() + th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), panel.grid = element_blank(), axis.title = element_blank()) +
-  facet_grid(~Sp_short, scales = "free")
-
-
+pl6_single<-plate6 %>% filter(compound %in% c('Cetrizine','Risperidone','Ethinylestradiol','Ranitidine','Montelukast','Acetaminophen','Aripirazole','Ibuprofen'))
+nrow(pl6_single)
+CairoSVG(file=paste("../Figures/pooled_es_pl6.svg", sep = ""), width = 16, height = 4, bg = "white")
+pl6_single  %>% dplyr::group_by(Bug_ID,Sp_short,compound) %>%
+  ggplot(aes(x=pooled_effect,y=compound)) + geom_errorbar(aes(xmin = low.ci, xmax = high.ci, color=Bug_ID)) + geom_point(aes(color=Bug_ID)) +
+  scale_color_igv() + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), axis.title = element_blank(),legend.position = "bottom") +
+  facet_grid(~Sp_short, scales = "free") + th
+dev.off()
+  
 #bug_aucs<-hits %>% filter(Bug_ID == 'NT24007', Plate_no == 'Plate1-GALCH',Compound == 'GAL-1-004')
 
+############## Bliss interactions
+View(znormAUCs)
+
+znormAUC<-znormAUCs[,c(1:9,14)]
+
+#normAUCs food compounds
+SFa<-znormAUCs %>% dplyr::group_by(Bug_ID) %>% filter(compound != 'DMSO' & Plate_no == "plate1") %>%
+  mutate(SFa = czscoreAUC)
+head(SFa)  
+nrow(SFa) #6048
+
+SFa<-SFa[,c(1:9,11)]
+colnames(SFa)[17]<-"SFa_auc_l"
+#merge(params, control_wells, by = c('Bug_ID','Replicate_no')) %>% dplyr::group_by(Bug_ID) %>% filter(well != 'H12' & Plate_no %in% c("plate12","plate13")) %>%
+#mutate(SFa = auc_l/max_aucl_h12_wells)
+
+#normAUCs drugs
+SFq<-znormAUCs %>% dplyr::group_by(Bug_ID) %>% filter(compound %in% c('Advantame-comb','Caffeine','Duloxetine','Vanillin')) %>%
+  mutate(SFq = czscoreAUC)
+head(SFq)
+nrow(SFq) #1,728
+SFq<-SFq[,c(1:9,11)]
+colnames(SFq)[17]<-"SFq_auc_l"
+############################################################
+#normAUCs food+drug
+SFaq<-znormAUCs %>% dplyr::group_by(Bug_ID) %>% filter(!(compound %in% c('Advantame-comb','Caffeine','Duloxetine','Vanillin','DMSO')) & !(Plate_no %in% c('plate1','plate6'))) %>%
+  mutate(SFaq = czscoreAUC)
+head(SFaq)
+View(SFaq) #24,192
+
+##### start joining SFaq and SFa
+View(SFaq)
+
+SFaq<-SFaq[,c(1:9,11)]
+colnames(SFaq)[17]<-"SFaq_auc_l"
+
+#merge Advantame
+p<-SFa
+head(p)
+p[p=="plate1"]<-"plate1+A"
+nrow(p) #6048
+
+merge_advantame<-merge(SFaq, p, by=c("Bug_ID","Plate_no","Replicate_no","Phyla","Sp_short","col_name","compound","tech"))
+head(merge_advantame)
+nrow(merge_advantame) #6048
+
+#merge caffeine
+
+l<-SFa
+l[l=="plate1"]<-"plate1+C"
+nrow(l) #6,048
+head(l)
+
+merge_caff<-merge(SFaq, l, by=c("Bug_ID","Plate_no","Replicate_no","Phyla","Sp_short","col_name","compound","tech"))
+head(merge_caff)
+nrow(merge_caff) #6,048
+
+#merge duloxetine
+
+o<-SFa
+o[o=="plate1"]<-"plate1+D"
+nrow(o) #6,048
+
+merge_dulox<-merge(SFaq, o, by=c("Bug_ID","Plate_no","Replicate_no","Phyla","Sp_short","col_name","compound","tech"))
+head(merge_dulox)
+nrow(merge_dulox) #6,048
+
+#merge vanillin
+
+f<-SFa
+f[f=="plate1"]<-"plate1+V"
+nrow(f) #6,048
+
+merge_vani<-merge(SFaq, f, by=c("Bug_ID","Plate_no","Replicate_no","Phyla","Sp_short","col_name","compound","tech"))
+head(merge_vani)
+nrow(merge_vani) #6,048
+
+merge_SFaq_SFa<-rbind(merge_advantame,merge_caff,merge_dulox,merge_vani)
+
+head(merge_SFaq_SFa)
+nrow(merge_SFaq_SFa) #24,192
+
+head(SFq)
+merge_SFaq_SFa_SFq<-merge(merge_SFaq_SFa, SFq, by=c("Bug_ID","Plate_no","Replicate_no","Phyla","Sp_short"))
+View(merge_SFaq_SFa_SFq)
+nrow(merge_SFaq_SFa_SFq) #38,570
+
+merge_SFaq_SFa_SFq<-merge_SFaq_SFa_SFq[,c(1:7,)]
+colnames(merge_SFaq_SFa_SFq)<-c("Bug_ID","Plate_no","Replicate_no",
+                                "Phyla","Sp_short","SFaq_well","SFaq_compound","SFaq_tech",
+                                "SFaq_auc_l",
+                                "SFaq","SFa_aucl",
+                                "SFa",
+                                "SFq_well","SFq_compound",
+                                "SFq_tech","SFq_aucl",
+                                "SFq")
+View(merge_SFaq_SFa_SFq)
+
+#bliss<-merge_SFaq_SFa_SFq %>% mutate(bliss_ex = SFa*SFq, bliss_score = SFaq-bliss_ex, label = ifelse(SFaq < bliss_ex, "synergy","antagonism"))
+bliss<-merge_SFaq_SFa_SFq %>% mutate(bliss_ex = SFa*SFq, bliss_score = SFaq-bliss_ex)
+head(bliss)
+View(bliss)
+
+write.table(bliss, file = "../Figures/bliss_scores", sep = "\t", quote = FALSE, row.names = FALSE)
 
 
+############statistical determination of synergy/antagonism
+
+nrow(bliss %>% filter(Plate_no != 'plate6'))
+
+nrow(bliss)
+
+A<-bliss %>% dplyr::group_by(Bug_ID,Plate_no,SFq_compound,SFaq_compound) %>% 
+  mutate(n1 = length(SFa), lSFa = log(SFa), y1=mean(lSFa), s1=var(lSFa)*(n1-1),
+         n2 = length(SFq), lSFq = log(SFq), y2=mean(lSFq), s2=var(lSFq)*(n2-1),
+         n3 = length(SFaq), lSFaq = log(SFaq), y3=mean(lSFaq), s3=var(lSFaq)*(n3-1),
+         sy=s1+s2+s3, dft=n1+n2+n3-3, denf=1/n1+1/n2+1/n3,
+         tss=(y1+y2-y3)/sqrt(sum(sy)/dft)/denf,
+         pv=2*(1-pt(abs(tss),df=dft)),
+         pvP=1-pt(tss,df=dft)) #n - no of observations (replicates), sy - total sum of squares, dft,denf - df, tss - t-statistic, pv - p-value for Bliss independence hypothesis, pvP - One-sided p-value
+
+View(A)
 
 
-###################### plot of compounds in control plates
-#Galchimia compounds
-CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/plate1_heatmap.svg", sep = ""), width = 2.8, height = 7, bg = "white")
-sig_hits %>% filter(Plate_no == "Plate1-GALCH") %>% dplyr::group_by(Bug_ID,Sp_short,Compound) %>%
-  ggplot(aes(x=Sp_short,y=Compound)) + geom_tile(aes(fill=combined_pv),color="#000000") +
-  scale_fill_distiller(palette = "RdGy") + th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), panel.grid = element_blank(), axis.title = element_blank())
+# density to determine bliss score distribution
+CairoSVG(file="/Users/periwal/GrowthCurver/Figures/bliss_density.svg", width = 9, height = 4, bg = "white")
+bliss %>% ggplot(aes(bliss_score)) + geom_density(aes(fill=SFq_compound, color=SFq_compound), alpha=0.8) +
+  facet_wrap("Sp_short", nrow = 3, scales = "free") + theme_bw() +
+  scale_fill_jama() + scale_color_jama() + th
+dev.off()
+
+#statistical determination of synergy/antagonism
+log_bliss<-bliss %>% dplyr::group_by(Bug_ID) %>%
+  mutate(logSFa = log10(SFa), logSFq = log10(SFq), logSFaq = log10(SFaq))
+
+head(log_bliss)
+
+View(bliss)
+# expected vs observed viability
+CairoSVG(file="../Figures/bliss_obs_exp.svg", width = 9, height = 6, bg = "white")
+bliss %>% group_by(Bug_ID,Sp_short,SFaq_compound,Replicate_no,Plate_no,SFq_compound) %>% 
+  summarise(av_bliss_ex=median(bliss_ex),av_SFaq=median(SFaq)) %>% ggplot(aes(x=av_SFaq,y=av_bliss_ex)) + geom_point(aes(color=SFq_compound), size=0.1) + geom_abline() + theme_bw() +
+  scale_y_continuous(name = "Expected viability (V1*V2)") + 
+  scale_x_continuous(name = "Observed viability (V12)") + scale_color_jama() + 
+  facet_wrap(~Sp_short, scales = "free") + th
+dev.off()
+
+#heatmap
+bliss_annot %>% ggplot(aes(x=Drug_name,y=Product.name)) + facet_grid(~Sp_short) + geom_tile(aes(fill=bliss_score)) + theme_bw() +
+  th + theme(axis.text.y = element_blank(), axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), panel.grid = element_blank()) + 
+  scale_fill_gradient2(low="#67001f",high="#1a1a1a") + scale_y_discrete(name = "Food compounds") 
+
+#####references
+View(bliss_annot)
+
+ref_bliss_annot<-bliss_annot %>% filter(bliss_score > -0.1 & bliss_score < 0.1) %>% dplyr::group_by(Bug_ID,Plate_no,well) %>% mutate(count = length(well)) 
+View(ref_bliss_annot)
+nrow(ref_bliss_annot) #26,719
+
+bliss_ref<-ref_bliss_annot %>% filter(count >= 3)
+head(bliss_ref)
+nrow(bliss_ref) #15,629
+
+bliss_ref_wells<-bliss_ref[,c(1:8,11:12,15:16,19:21,23)]
+bliss_ref_wells["outcome"]<-"reference"
+View(bliss_ref_wells)
+nrow(bliss_ref_wells) #15629
+ncol(bliss_ref_wells) #17
+
+##samples
+
+bliss_others<-bliss_annot[,c(1:8,11:12,15:16,19:21,23)]
+
+samples_bliss<-anti_join(bliss_others, bliss_ref, by=c("Bug_ID","Replicate_no","Plate_no","Drug_name","well","Phyla","Species","Sp_short","SFaq","SFa_Drug_name","SFa","SFq_well","SFq","bliss_ex","bliss_score","Product.name"))
+nrow(samples_bliss)  #22941
+samples_bliss["outcome"]<-"sample"
+ncol(samples_bliss) #17
+head(samples_bliss)
+
+
+total_list_bliss<-rbind(data.frame(bliss_ref_wells),data.frame(samples_bliss))
+head(total_list_bliss)
+nrow(total_list_bliss) #38,570
+View(total_list_bliss)
+ncol(total_list_bliss) #17
+
+## compute pval
+
+#synergies
+syn_bliss<-bliss_annot %>% filter(bliss_score < 0) %>% dplyr::group_by(Bug_ID,Plate_no,well) %>% mutate(count = length(well))
+nrow(syn_bliss) #24,069
+head(syn_bliss)
+
+syn_bliss_ref<-syn_bliss %>% filter(bliss_score < -0.1 & count >= 3)
+head(syn_bliss_ref)
+nrow(syn_bliss_ref) #5287
+
+syn_ref_wells<-syn_bliss_ref[,c(1:8,11:12,15:16,19:21,23)]
+syn_ref_wells["outcome"]<-"reference"
+View(syn_ref_wells)
+nrow(syn_ref_wells) #5287
+ncol(syn_ref_wells) #17
+
+##samples
+
+syn_others<-syn_bliss[,c(1:8,11:12,15:16,19:21,23)]
+
+syn_samples<-anti_join(syn_others, syn_ref_wells, by=c("Bug_ID","Replicate_no","Plate_no","Drug_name","well","Phyla","Species","Sp_short","SFaq","SFa_Drug_name","SFa","SFq_well","SFq","bliss_ex","bliss_score","Product.name"))
+nrow(syn_samples)  #18782
+syn_samples["outcome"]<-"sample"
+ncol(syn_samples) #17
+head(syn_samples)
+
+
+total_syn<-rbind(data.frame(syn_ref_wells),data.frame(syn_samples))
+head(total_syn)
+nrow(total_syn) #24,069
+View(total_syn)
+ncol(total_syn) #17
+
+#Bug wise
+syn_hits_rep<-total_syn %>% dplyr::group_by(Bug_ID) %>% do(compute_pval_syn(.))
+head(syn_hits_rep)
+nrow(syn_hits_rep) #24,069
+
+#Bug and Replicate wise
+syn_hits_rep_plate<-total_syn %>% dplyr::group_by(Bug_ID,Replicate_no) %>%
+  do(compute_pval_syn(.))
+head(syn_hits_rep_plate)
+nrow(syn_hits_rep_plate) #24,069
+
+# take max of both pvals (conservative estimate)
+syn_max_pvals<-merge(syn_hits_rep,syn_hits_rep_plate,by=c("Bug_ID","Replicate_no","Plate_no",
+                                                          "Drug_name","well","Phyla",
+                                                          "Species","Sp_short","bliss_score","outcome"))
+
+
+syn_max_pvals$pv<-pmax(syn_max_pvals$pv.x,syn_max_pvals$pv.y)
+syn_max_pvals$label<-"synergy"
+syn_max_pvals<-syn_max_pvals[,c(1:10,25,27:28)]
+View(syn_max_pvals)
+
+syn_ref<-syn_hits_rep %>% filter(outcome=='reference') %>% ggplot(aes(x=pv)) + geom_histogram(color="white",fill="#4d4d4d",bins = 30) + ggtitle(label = "synergies ref") + th
+syn_samp<-syn_hits_rep %>% filter(outcome=='sample') %>% ggplot(aes(x=pv)) + geom_histogram(color="white",fill="#4d4d4d",bins = 30) + ggtitle(label = "synergies hits") + th
+
+
+##antagonisms
+ant_bliss<-total_list_bliss %>% filter(bliss_score > 0)
+nrow(ant_bliss) #14,499
+
+#Bug wise
+ant_hits_rep<-ant_bliss %>% dplyr::group_by(Bug_ID) %>% do(compute_pval_bliss_ant(.))
+head(ant_hits_rep)
+nrow(ant_hits_rep) #14,499
+
+#Bug and Replicate wise
+ant_hits_rep_plate<-ant_bliss %>% dplyr::group_by(Bug_ID,Replicate_no) %>%
+  do(compute_pval_bliss_ant(.))
+View(ant_hits_rep_plate)
+nrow(ant_hits_rep_plate) #14,499
+
+# take max of both pvals (conservative estimate)
+ant_max_pvals<-merge(hits_rep,hits_rep_plate,by=c("Bug_ID","Replicate_no","Plate_no",
+                                                  "Drug_name","well","Phyla",
+                                                  "Species","Sp_short","bliss_score","outcome"))
+
+
+ant_max_pvals$pv<-pmax(ant_max_pvals$pv.x,ant_max_pvals$pv.y)
+ant_max_pvals$label<-"antagonism"
+ant_max_pvals<-ant_max_pvals[,c(1:10,27,29:30)]
+View(ant_max_pvals)
+
+ant_ref<-ant_max_pvals %>% filter(outcome=='reference') %>% ggplot(aes(x=pv)) + geom_histogram(color="white",fill="#4d4d4d",bins = 30) + ggtitle(label = "antagonisms ref") + th
+ant_samp<-ant_max_pvals %>% filter(outcome=='sample') %>% ggplot(aes(x=pv)) + geom_histogram(color="white",fill="#4d4d4d",bins = 30) + ggtitle(label = "antagonisms hits") + th
+
+
+### plot syn and ant pval distribution
+
+CairoSVG(file="/Users/periwal/GrowthCurver/Figures/syn_ant_pvals.svg", width = 5, height = 4, bg = "white")
+grid.arrange(syn_ref, ant_ref, syn_samp, ant_samp, nrow = 2)
 dev.off()
 
 
-#Commercial sweeteners
-CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/plate2_heatmap.svg", sep = ""), width = 4, height = 7, bg = "white")
-sig_hits %>% filter(Plate_no == "Plate2-Comm") %>% dplyr::group_by(Bug_ID,Sp_short,Compound) %>%
-  ggplot(aes(x=Sp_short,y=Compound)) + geom_tile(aes(fill=combined_pv),color="#000000") +
-  scale_fill_distiller(palette = "RdGy") + th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), panel.grid = element_blank(), axis.title = element_blank())
-dev.off()
 
-#Commercial sweeteners + Sweeteners
-CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/plate1+A_heatmap.svg", sep = ""), width = 2.8, height = 7, bg = "white")
-normAUCl %>% filter(Plate_no == "Plate2+A") %>% dplyr::group_by(Bug_ID,Replicate_no,Sp_short,Compound) %>% filter(!col_name %in% c('H6','H7','H8','H9','H10','H11','H12')) %>% summarise(av_auc = mean(normAUC)) %>%
-  ggplot(aes(x=Sp_short,y=Compound)) + geom_tile(aes(fill=av_auc),color="#000000") +
-  scale_fill_distiller(palette = "PiYG") + th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), panel.grid = element_blank(), axis.title = element_blank())
-dev.off()
-
-
-
-
-
-
-
-###### fit distribution per bug plate wise (all replicates pooled)
-
-# Plot normAUCs distribution
-CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/density_distribution.svg", sep = ""), width = 5, height = 2, bg = "white")
-normAUCl %>% ggplot(aes(normAUC)) + geom_density(aes(fill=Species, color = Species), alpha = 0.5) + th + 
-  scale_fill_npg() + scale_color_npg() + theme_minimal()
-dev.off()
-
-nrow(normAUCl) #11480
-head(normAUCl)
-
-# Effect of single compounds only
-single_sweet<-normAUCl %>% filter(Plate_no %in% c("Plate1-GALCH","Plate2-Comm"))
-head(single_sweet)
-
-#plot normalized AUCs in control wells
-CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/control_wells_normAUC.svg", sep = ""), width = 5, height = 3, bg = "white")
-single_sweet %>% filter(Compound == 'DMSO') %>% dplyr::group_by(Bug_ID,Replicate_no) %>% 
-  ggplot(aes(x=Sp_short,y=normAUC)) + geom_boxplot(aes(fill = Replicate_no), lwd=0.1, position = "dodge2", outlier.size = 0.2) +
-  th + scale_fill_jama() + theme(axis.text.x = element_text(angle = 90, hjust = 1))
-dev.off()
-
-# Define reference wells
-ref_wells<-single_sweet %>% filter(Compound == 'DMSO')
-head(ref_wells)
-ref_wells<-ref_wells[,c(1:6,23:27)]
-ref_wells["label"]<-"reference"
-nrow(ref_wells) #861
-ncol(ref_wells) #12
-View(ref_wells)
-
-#descdist(ref_wells$normAUC, discrete = FALSE, boot = 1000)
-
-sample_wells<-single_sweet %>% filter(!(Compound == 'DMSO'))
-head(sample_wells)
-sample_wells<-sample_wells[,c(1:6,23:27)]
-sample_wells["label"]<-"sample"
-nrow(sample_wells) #2014
-ncol(sample_wells) #12
-View(sample_wells)
-
-total<-rbind(data.frame(ref_wells),data.frame(sample_wells))
-head(total)
-nrow(total) #2299
-
-#compute z scores (first take mean of technical replicates)
-z_scores<-sample_wells %>% dplyr::group_by(Bug_ID,Replicate_no,Plate_no,Species,Sp_short,Compound) %>% summarise(mean_normAUC = mean(normAUC)) %>% 
-  mutate(plate_mean = mean(mean_normAUC), plate_sd = sd(mean_normAUC)) %>% dplyr::group_by(Bug_ID,Replicate_no,Plate_no,Species,Sp_short,Compound) %>%
-  mutate(zscore = (mean_normAUC-plate_mean)/plate_sd)
-View(z_scores)
-
-# plot zscores
-# use Z scores - to determine validity of hits
-CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/control_zscores.svg", sep = ""), width = 6, height = 3, bg = "white")
-z_scores %>% ggplot(aes(zscore)) + geom_density(aes(fill=Species, color = Species), alpha = 0.5) + th + 
-  scale_fill_npg() + scale_color_npg() + theme_minimal()
-dev.off()
-
-# filter zscores
-
-significant_hits<-z_scores %>% filter(zscore < -1.5 | zscore > 1.5) %>% dplyr::group_by(Bug_ID,Plate_no,Compound) %>%
-  mutate(count = length(Compound))
-View(significant_hits)
-
-# NON-PARAMETRIC TEST: two sample Welch test (different sample sizes)
-
-# filter all sample wells
-# hits<-total %>%  dplyr::group_by(Bug_ID,Replicate_no,Plate_no) %>% 
-#   do(welch_pval(.))
-# 
-# View(hits)
-
-#PROBLEM: many compounds don't have a paired tech replicate so can't be 
-#processed with this method. P-values are strange 
-
-
-#PARAMETRIC TEST: Requires distribution, can be used for single observation
-set.seed(444)
-
-#Compare different distributions (single compound plates)
-
-# dist_compare<-total %>% filter(Plate_no %in% c("Plate1-GALCH","Plate2-Comm")) %>% dplyr::group_by(Bug_ID,Replicate_no,Plate_no) %>% 
-#   do(fitCompare(.))
-# names(dist_compare)[names(dist_compare) == "dist.i."] <- "distribution"
-# names(dist_compare)[names(dist_compare) == "chisqpv"] <- "pv"
-# View(dist_compare)
-# 
-# dist_compare %>% filter(pv > 0.05) %>% ggplot(aes(x=distribution,y=pv)) + geom_boxplot(aes(fill=Plate_no))
-# 
-# #Plot plate1 and plate 2 graphs
-# 
-
-distri<-total %>% filter(Plate_no %in% c("Plate1-GALCH","Plate2-Comm")) 
-View(distri)
-nrow(distri)
-
-# # cullen n frey graph
-CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/distribution.svg", sep = ""), width = 5, height = 5, bg = "white")
-descdist(distri$normAUC, discrete = FALSE, boot = 1000)
-dev.off()
-
-View(total)
-nrow(total)
-
-#Replicate and Plate wise
-
-hits_rep_plate<-total %>% dplyr::group_by(Bug_ID,Replicate_no,Plate_no) %>% do(welch_pval(.))
-View(hits_rep_plate)
-nrow(hits_rep_plate) #11480
-
-CairoSVG(file=paste("/Users/periwal/ShikiFactory/WP3/SW_SF100/Figures/pval_nullhypothesis.svg", sep = ""), width = 3, height = 2, bg = "white")
-hits %>% filter(label=='reference') %>% ggplot(aes(x=pv)) + geom_histogram(color="white",fill="#4d4d4d",bins = 30) + th
-dev.off()
-
-CairoSVG(file=paste("/Users/vinitaperiwal/GrowthCurver/Figures/pval_alternatehypothesis.svg", sep = ""), width = 3, height = 2, bg = "white")
-wil_test %>% filter(label=='sample') %>% ggplot(aes(x=pv)) + geom_histogram(color="white",fill="#4d4d4d",bins = 30) + th
-dev.off()
-
-hits_rep_plate %>% ggplot(aes(x=pv)) + geom_histogram(aes(fill=label),color="white",bins = 30) + th + scale_fill_nejm()

@@ -174,31 +174,16 @@ fitCompare<-function(bug_aucs){
 
 }
 
-#shapiro wilk test for normality
-
-shap_wilk<-function(bug_aucs){
-  
-  nrow(bug_aucs)
-  #View(bug_aucs)
-  aucs<-bug_aucs$zscoreAUC
-  
-  shap<-shapiro.test(aucs)
-  head(shap)
-  
-  df<-data.frame(shap$p.value)
-  
-  return(df)
-}
 
 
 # unpaired two samples welch t-test
 unpairedT_pval<-function(bug_aucs){
  
-  samples<-bug_aucs %>% filter(Compound!='DMSO')
-  comp<-unique(samples$Compound)
+  samples<-bug_aucs
+  comp<-unique(samples$compound)
   comp
   
-  ref_aucs<-(bug_aucs %>% filter(Compound == 'DMSO'))$cnormAUC
+  ref_aucs<-(bug_aucs %>% filter(compound == 'DMSO'))$czscoreAUC
   ref_aucs
   
   out_df<-data.frame(stringsAsFactors = FALSE)
@@ -209,20 +194,22 @@ unpairedT_pval<-function(bug_aucs){
     print(samples$Bug_ID[1])
     print(samples$Plate_no[1])
     
-    entry<-samples %>% filter(Compound == comp[i])
+    entry<-samples %>% filter(compound == comp[i])
     entry
     
     Bug_ID = entry$Bug_ID[1]
     Replicate_no = entry$Replicate_no[1]
     Plate_no = entry$Plate_no[1]
-    Compound = entry$Compound[1]
+    compound = entry$compound[1]
     Phyla = entry$Phyla[1]
-    Species = entry$Species[1]
     Sp_short = entry$Sp_short[1]
     
-    samp_aucs<-(samples %>% filter(Compound == comp[i]))$cnormAUC
+    
+    samp_aucs<-(samples %>% filter(compound == comp[i]))$czscoreAUC
     print(samp_aucs)
     print(length(samp_aucs))
+    
+    avFC = mean((samples %>% filter(compound == comp[i]))$FC) #mean for technical reps
     
     if(length(samp_aucs) > 1 & length(ref_aucs) > 1){
     
@@ -231,6 +218,9 @@ unpairedT_pval<-function(bug_aucs){
     pv<-test$p.value
     conf.int.lower<-test$conf.int[1]
     conf.int.upper<-test$conf.int[2]
+    sam<-length(samp_aucs)
+    ref<-length(ref_aucs)
+    t_stat<-test$statistic
     
     # estimate effect size from t-statistic (cohen's d, for correction and bias in small samples use: hedge's g)
     esize<-esc_t(test$statistic, grp1n = length(samp_aucs), grp2n = length(ref_aucs), es.type = "g")
@@ -240,7 +230,7 @@ unpairedT_pval<-function(bug_aucs){
     lci<-esize$ci.lo
     uci<-esize$ci.hi
     
-    z<-data.frame(Bug_ID,Replicate_no,Plate_no,Compound,Phyla,Species,Sp_short,pv,conf.int.lower,conf.int.upper,es,gse,lci,uci)
+    z<-data.frame(Bug_ID,Replicate_no,Plate_no,compound,Phyla,Sp_short,pv,conf.int.lower,conf.int.upper,es,gse,lci,uci,ref,sam,t_stat,avFC)
     z
   
     out_df<-rbind(out_df,z)
@@ -264,7 +254,7 @@ pool_es<-function(bug_aucs){
   
   out_df<-data.frame(stringsAsFactors = FALSE)
   head(bug_aucs)    
-  met<-metagen(data = bug_aucs, TE = es, seTE = gse, comb.fixed = FALSE, comb.random = TRUE, hakn = TRUE, method.tau = "REML")
+  met<-metagen(data = bug_aucs, TE = es, seTE = gse, comb.fixed = FALSE, comb.random = TRUE, method.tau = "HE")
   #print(met)
   
   pval_es<-met$pval.random
@@ -272,47 +262,13 @@ pool_es<-function(bug_aucs){
   high.ci<-met$upper.random
   pooled_effect<-met$TE.random
   es_fixed<-met$TE.fixed
+  studies_combined<-met$k
     
-  z<-data.frame(pval_es,low.ci,high.ci,pooled_effect,es_fixed)
+  z<-cbind(pval_es,low.ci,high.ci,pooled_effect,es_fixed,studies_combined)
   z
   
-  out_df<-rbind(out_df,z)
-  return(out_df)
+  #out_df<-rbind(out_df,z)
+  return(z)
   
 }
 
-# n<-length(sample_wells$well)
-# n
-# 
-# total_wells<-rbind(ref_wells,sample_wells)
-# nrow(total_wells)
-# head(total_wells)
-# 
-# out_df<-data.frame(stringsAsFactors = FALSE)
-# 
-# for(i in 1:length(total_wells$well)){
-#   
-#   Bug_ID<-total_wells[i,1]
-#   Replicate_no<-total_wells[i,2]
-#   Plate_no<-total_wells[i,3]
-#   Drug_name<-total_wells[i,4]
-#   well<-total_wells[i,5]
-#   auc_l<-total_wells[i,6]
-#   normAUC<-total_wells[i,7]
-#   Phyla<-total_wells[i,8]
-#   Species<-total_wells[i,9]
-#   Sp_short<-total_wells[i,10]
-#   label<-total_wells[i,11]
-#   
-#   t.val<-(as.numeric(normAUC)-mean_ref_normAUC)/(sd_sample_normAUC/sqrt(n))
-#   t.val
-#   p.val<-pt(-abs(t.val),df=n-1)
-#   p.val
-#   
-#   df<-data.frame(Bug_ID,Replicate_no,Plate_no,Drug_name,well,auc_l,normAUC,t.val,p.val,Phyla,Species,Sp_short,label)
-#   out_df<-rbind(out_df,df)
-#   
-# }
-# 
-# return(out_df)
-# }
