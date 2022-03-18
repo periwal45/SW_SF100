@@ -27,154 +27,6 @@ create_annot <- function(input_file){
   
 }
 
-## fit and plot different distributions (read paper fitdistrplus, 2018)
-### function to compute p-value from t-distribution
-
-compute_pval_syn<-function(total_list_bliss){
-  
-  head(total_list_bliss)
-  nrow(total_list_bliss)
-  scores<-NULL
-  scores<-(total_list_bliss %>% filter(outcome == 'reference'))$bliss_score
-
-  f <- fitStudent(abs(scores))
-  f
-  
-  total_list_bliss$pv <- pstudent(abs(total_list_bliss$bliss_score), f$estimate["nu"], f$estimate["mean"], f$estimate["sigma"])
-  
-  df<-data.frame(total_list_bliss)
-  return(df)
-
-}
-
-compute_pval_bliss_ant<-function(total_list_bliss){
-  
-  head(total_list_bliss)
-  nrow(total_list_bliss)
-  scores<-NULL
-  scores<-(total_list_bliss %>% filter(outcome == 'reference'))$bliss_score
-  
-  f <- fitStudent_ant(scores)
-  f
-  
-  total_list_bliss$pv <- 1-pstudent(total_list_bliss$bliss_score, f$estimate["nu"], f$estimate["mean"], f$estimate["sigma"])
-  
-  df<-data.frame(total_list_bliss)
-  return(df)
-  
-}
-
-fitStudent <- function(y) {
-  
-  f <- NULL
-  f <- fitdistrplus::fitdist(y, "student", start=list(nu=30, mean=mean(y), sigma=sd(y)))
-  f
-}
-
-fitLNorm <- function(y) {
-  
-  f <- fitdistrplus::fitdist(y, "lnorm")
-  f
-}
-
-compute_pval<-function(bug_aucs){
-  
-  head(bug_aucs)
-  nrow(bug_aucs)
-  
-  normAUCs<-(bug_aucs %>% filter(label == 'reference'))$normAUC
-  head(normAUCs)
-  
-  f <- fitStudent(normAUCs)
-  #if (is.na(f$estimate["nu"])) {
-  
-  #bug_aucs$pv <- plnorm(bug_aucs$normAUC, f$estimate["meanlog"], f$estimate["sdlog"])
-  bug_aucs$pv <- pstudent(bug_aucs$normAUC, f$estimate["nu"], f$estimate["mean"], f$estimate["sigma"])
-  #bug_aucs$pv_upper <- pnorm(bug_aucs$normAUC, f$estimate["mean"], f$estimate["sd"], lower.tail = F)
-  
-  #} else {
-  
-  #bug_aucs$pv <- pstudent(bug_aucs$normAUC, f$estimate["nu"], f$estimate["mean"], f$estimate["sigma"])
-  
-  #bug_aucs$pv_upper <- pstudent(bug_aucs$normAUC, f$estimate["nu"], f$estimate["mean"], f$estimate["sigma"], lower.tail = F)
-  #}
-  
-  df<-data.frame(bug_aucs)
-  return(df)
-  
-}
-
-########
-dlnorm<-function(x, meanlog, sdlog) dlnorm(x, meanlog, sdlog, log = FALSE)
-plnorm<-function(q, meanlog, sdlog, lower.tail, log.p) plnorm(q, meanlog, sdlog, lower.tail = TRUE, log.p = FALSE)
-qlnorm<-function(p, meanlog, sdlog, lower.tail, log.p) qlnorm(p, meanlog, sdlog, lower.tail = TRUE, log.p = FALSE)
-rlnorm<-function(n, meanlog, sdlog) rlnorm(n, meanlog, sdlog)
-
-
-dstudent <- function(x, nu, mean, sigma) dt((x-mean)/sigma, nu, log=F)/sigma
-pstudent <- function(q, nu, mean, sigma) pt((q-mean)/sigma, nu)
-qstudent <- function(p, nu, mean, sigma) (qt(p, nu)*sigma+mean)
-
-# dnormal<-function(x, mean, sd) dnorm(x, mean, sd, log = FALSE)
-# pnormal<-function(p, mean, sd) pnorm(q, mean, sd, lower.tail = TRUE, log.p = FALSE)
-# qnormal<-function(q, mean, sd) qnorm(p, mean, sd, lower.tail = TRUE, log.p = FALSE)
-# rnormal<-function(r, mean, sd) rnorm(n, mean, sd)
-
-
-fitStudentOrLnormal <- function(y) {
-  f <- NULL
-  try({
-   f <- fitdistrplus::fitdist(y, "student", start=list(nu=30, mean=mean(y), sigma=sd(y)))
-  })
-  if (is.null(f) || f$estimate[1] > 100) {
-    f <- fitdistrplus::fitdist(y, "lnorm")
-  }
-  f
-}
-
-
-fitCompare<-function(bug_aucs){
-  
-  normAUCs<-(bug_aucs %>% filter(label == 'reference'))$normAUC
-  print(normAUCs)
-  
-  gofs<-data.frame(stringsAsFactors = FALSE)
-  dist <- c("norm", "lnorm", "gamma", "student", "weibull", "cauchy")
-  
-  # Loop through your list of distributions
-  for(i in 1:length(dist)){
-    
-    print(dist[i])
-    
-    try({
-    if(dist[i] == "student"){
-      
-      x<-fitdistrplus::fitdist(normAUCs, "student", start=list(nu=30, mean=mean(normAUCs), sigma=sd(normAUCs)))
-      l<-gofstat(x)
-      chisqpv<-l$chisqpvalue
-      if(length(chisqpv) > 0){
-        gofs<-rbind(gofs,data.frame(dist[i],chisqpv))
-      }
-      
-      }else{
-        
-      x <- fitdistrplus::fitdist(normAUCs, dist[i])
-      l<-gofstat(x)
-      chisqpv<-l$chisqpvalue
-      if(length(chisqpv) > 0){
-        gofs<-rbind(gofs,data.frame(dist[i],chisqpv))
-      }
-  
-      }
-    })
-    
-  }
-
-  return(gofs)
-
-}
-
-
 
 # unpaired two samples welch t-test
 unpairedT_pval<-function(bug_aucs){
@@ -272,3 +124,52 @@ pool_es<-function(bug_aucs){
   
 }
 
+#adapted from https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0224137#sec020
+
+t_distr<-function(y){ 
+  
+  n1 = length(y$SFa)
+  n2 = length(y$SFq)
+  n3 = length(y$SFaq)
+  
+  y1=mean(y$SFa)
+  y2=mean(y$SFq)
+  y3=mean(y$SFaq) 
+  
+  s1=var(y$SFa)*(n1-1)
+  s2=var(y$SFq)*(n2-1)
+  s3=var(y$SFaq)*(n3-1)
+  
+  sy=s1+s2+s3
+  dft=n1+n2+n3-3
+  denf=1/n1+1/n2+1/n3
+  tss=(y1+y2-y3)/sqrt(sum(sy)/dft)/denf
+  pv=2*(1-pt(abs(tss),df=dft))
+  pvP=1-pt(tss,df=dft)
+  
+  #n - no of observations (replicates), sy - total sum of squares, dft,denf - df, tss - t-statistic, pv - p-value for Bliss independence hypothesis, pvP - One-sided p-value
+  
+  df<-data.frame("T-stat" = tss, "bliss_score" = y1+y2-y3, "bliss" = exp(y1+y2-y3), "pval" = pv)
+  return(df)
+  
+}
+
+anov<-function(y){
+
+  res.aov<-aov(y$SFaq ~ y$SFa+y$SFq, data=y)
+  pv<-summary(res.aov)[[1]][["Pr(>F)"]][1]
+  df<-summary(res.aov)[[1]][["Df"]][3]
+  f_val<-summary(res.aov)[[1]][["F value"]][1]
+  
+  if(length(pv) & length(df) & length(f_val) > 0){
+    
+    df<-data.frame("pv" = pv,"df" = df,"f_val" = f_val)
+    
+  }else{
+    
+    df<-data.frame("pv" = NULL,"df" = NULL,"f_val" = NULL)
+    
+  }
+
+  return(df)
+}
