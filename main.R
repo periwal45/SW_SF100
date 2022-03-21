@@ -632,9 +632,9 @@ nrow(merge_SFaq_SFa_SFq) #23,629
 
 #write.table(bliss, file = "../Figures/bliss_scores", sep = "\t", quote = FALSE, row.names = FALSE)
 
-bliss<-merge_SFaq_SFa_SFq %>% mutate(exp_bliss = SFa+SFq)
+bliss<-merge_SFaq_SFa_SFq %>% mutate(bliss_score = SFa+SFq-SFaq, exp_score = SFa+SFq)
 nrow(bliss) #23,629
-View(bliss)  
+head(bliss)  
 ############statistical determination of synergy/antagonism
 
 A_bliss<-bliss %>% filter_if(~is.numeric(.), all_vars(!is.infinite(.)))
@@ -649,7 +649,17 @@ head(AB)
 nrow(AB) #4,173
 View(AB)
 
-sig_pval<-AB %>% filter(pv < 0.05)
+EnhancedVolcano(AB,
+                lab = AB$compound,
+                x = 'bliss_score',
+                y = 'p_bh',
+                pCutoff = 0.01,
+                FCcutoff = 0.3,
+                legendPosition = 'bottom',
+                labSize = 4
+)
+
+sig_pval<-AB %>% filter(pv < 0.01)
 head(sig_pval)
 nrow(sig_pval)
 View(sig_pval)
@@ -683,135 +693,6 @@ bliss_annot %>% ggplot(aes(x=Drug_name,y=Product.name)) + facet_grid(~Sp_short) 
   th + theme(axis.text.y = element_blank(), axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), panel.grid = element_blank()) + 
   scale_fill_gradient2(low="#67001f",high="#1a1a1a") + scale_y_discrete(name = "Food compounds") 
 
-#####references
-View(bliss_annot)
-
-ref_bliss_annot<-bliss_annot %>% filter(bliss_score > -0.1 & bliss_score < 0.1) %>% dplyr::group_by(Bug_ID,Plate_no,well) %>% mutate(count = length(well)) 
-View(ref_bliss_annot)
-nrow(ref_bliss_annot) #26,719
-
-bliss_ref<-ref_bliss_annot %>% filter(count >= 3)
-head(bliss_ref)
-nrow(bliss_ref) #15,629
-
-bliss_ref_wells<-bliss_ref[,c(1:8,11:12,15:16,19:21,23)]
-bliss_ref_wells["outcome"]<-"reference"
-View(bliss_ref_wells)
-nrow(bliss_ref_wells) #15629
-ncol(bliss_ref_wells) #17
-
-##samples
-
-bliss_others<-bliss_annot[,c(1:8,11:12,15:16,19:21,23)]
-
-samples_bliss<-anti_join(bliss_others, bliss_ref, by=c("Bug_ID","Replicate_no","Plate_no","Drug_name","well","Phyla","Species","Sp_short","SFaq","SFa_Drug_name","SFa","SFq_well","SFq","bliss_ex","bliss_score","Product.name"))
-nrow(samples_bliss)  #22941
-samples_bliss["outcome"]<-"sample"
-ncol(samples_bliss) #17
-head(samples_bliss)
-
-
-total_list_bliss<-rbind(data.frame(bliss_ref_wells),data.frame(samples_bliss))
-head(total_list_bliss)
-nrow(total_list_bliss) #38,570
-View(total_list_bliss)
-ncol(total_list_bliss) #17
-
-## compute pval
-
-#synergies
-syn_bliss<-bliss_annot %>% filter(bliss_score < 0) %>% dplyr::group_by(Bug_ID,Plate_no,well) %>% mutate(count = length(well))
-nrow(syn_bliss) #24,069
-head(syn_bliss)
-
-syn_bliss_ref<-syn_bliss %>% filter(bliss_score < -0.1 & count >= 3)
-head(syn_bliss_ref)
-nrow(syn_bliss_ref) #5287
-
-syn_ref_wells<-syn_bliss_ref[,c(1:8,11:12,15:16,19:21,23)]
-syn_ref_wells["outcome"]<-"reference"
-View(syn_ref_wells)
-nrow(syn_ref_wells) #5287
-ncol(syn_ref_wells) #17
-
-##samples
-
-syn_others<-syn_bliss[,c(1:8,11:12,15:16,19:21,23)]
-
-syn_samples<-anti_join(syn_others, syn_ref_wells, by=c("Bug_ID","Replicate_no","Plate_no","Drug_name","well","Phyla","Species","Sp_short","SFaq","SFa_Drug_name","SFa","SFq_well","SFq","bliss_ex","bliss_score","Product.name"))
-nrow(syn_samples)  #18782
-syn_samples["outcome"]<-"sample"
-ncol(syn_samples) #17
-head(syn_samples)
-
-
-total_syn<-rbind(data.frame(syn_ref_wells),data.frame(syn_samples))
-head(total_syn)
-nrow(total_syn) #24,069
-View(total_syn)
-ncol(total_syn) #17
-
-#Bug wise
-syn_hits_rep<-total_syn %>% dplyr::group_by(Bug_ID) %>% do(compute_pval_syn(.))
-head(syn_hits_rep)
-nrow(syn_hits_rep) #24,069
-
-#Bug and Replicate wise
-syn_hits_rep_plate<-total_syn %>% dplyr::group_by(Bug_ID,Replicate_no) %>%
-  do(compute_pval_syn(.))
-head(syn_hits_rep_plate)
-nrow(syn_hits_rep_plate) #24,069
-
-# take max of both pvals (conservative estimate)
-syn_max_pvals<-merge(syn_hits_rep,syn_hits_rep_plate,by=c("Bug_ID","Replicate_no","Plate_no",
-                                                          "Drug_name","well","Phyla",
-                                                          "Species","Sp_short","bliss_score","outcome"))
-
-
-syn_max_pvals$pv<-pmax(syn_max_pvals$pv.x,syn_max_pvals$pv.y)
-syn_max_pvals$label<-"synergy"
-syn_max_pvals<-syn_max_pvals[,c(1:10,25,27:28)]
-View(syn_max_pvals)
-
-syn_ref<-syn_hits_rep %>% filter(outcome=='reference') %>% ggplot(aes(x=pv)) + geom_histogram(color="white",fill="#4d4d4d",bins = 30) + ggtitle(label = "synergies ref") + th
-syn_samp<-syn_hits_rep %>% filter(outcome=='sample') %>% ggplot(aes(x=pv)) + geom_histogram(color="white",fill="#4d4d4d",bins = 30) + ggtitle(label = "synergies hits") + th
-
-
-##antagonisms
-ant_bliss<-total_list_bliss %>% filter(bliss_score > 0)
-nrow(ant_bliss) #14,499
-
-#Bug wise
-ant_hits_rep<-ant_bliss %>% dplyr::group_by(Bug_ID) %>% do(compute_pval_bliss_ant(.))
-head(ant_hits_rep)
-nrow(ant_hits_rep) #14,499
-
-#Bug and Replicate wise
-ant_hits_rep_plate<-ant_bliss %>% dplyr::group_by(Bug_ID,Replicate_no) %>%
-  do(compute_pval_bliss_ant(.))
-View(ant_hits_rep_plate)
-nrow(ant_hits_rep_plate) #14,499
-
-# take max of both pvals (conservative estimate)
-ant_max_pvals<-merge(hits_rep,hits_rep_plate,by=c("Bug_ID","Replicate_no","Plate_no",
-                                                  "Drug_name","well","Phyla",
-                                                  "Species","Sp_short","bliss_score","outcome"))
-
-
-ant_max_pvals$pv<-pmax(ant_max_pvals$pv.x,ant_max_pvals$pv.y)
-ant_max_pvals$label<-"antagonism"
-ant_max_pvals<-ant_max_pvals[,c(1:10,27,29:30)]
-View(ant_max_pvals)
-
-ant_ref<-ant_max_pvals %>% filter(outcome=='reference') %>% ggplot(aes(x=pv)) + geom_histogram(color="white",fill="#4d4d4d",bins = 30) + ggtitle(label = "antagonisms ref") + th
-ant_samp<-ant_max_pvals %>% filter(outcome=='sample') %>% ggplot(aes(x=pv)) + geom_histogram(color="white",fill="#4d4d4d",bins = 30) + ggtitle(label = "antagonisms hits") + th
-
-
-### plot syn and ant pval distribution
-
-CairoSVG(file="/Users/periwal/GrowthCurver/Figures/syn_ant_pvals.svg", width = 5, height = 4, bg = "white")
-grid.arrange(syn_ref, ant_ref, syn_samp, ant_samp, nrow = 2)
-dev.off()
 
 
 
