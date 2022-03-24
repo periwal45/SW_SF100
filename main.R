@@ -387,10 +387,13 @@ params_bugs_cmp_filtered %>% group_by(Bug_ID,Sp_short,Replicate_no,Plate_no) %>%
 
 ##### plate-based normalization (robust z-score)
 
-View(params_bugs_cmp_filtered)
+head(params_bugs_cmp_filtered)
 
 params<-params_bugs_cmp_filtered[,c(1:6,23,25,20)]
+head(params)
 dim(params) #40,939 X 9
+
+write.table(params, file = '../Figures/cleaned_params', sep = '\t', row.names = FALSE)
 
 cnormAUCl_z<-params %>% filter(compound == 'DMSO') %>% dplyr::group_by(Bug_ID,Plate_no,Replicate_no,Phyla,Sp_short) %>%
   summarise(ctrl_mean = mean(auc_l), std_ctrl = std(auc_l))
@@ -466,7 +469,7 @@ nrow(es_pv_l2fc %>% filter(Plate_no == 'plate1' & combined_pv < 0.05)) #631
 p_bh<-es_pv_l2fc %>% dplyr::group_by(Bug_ID,Plate_no) %>%
   mutate(pv_bh = p.adjust(combined_pv,method = "BH"))
 head(p_bh)
-nrow(p_bh) #5925
+nrow(p_bh) #1050
 
 hits<-p_bh %>% filter(l2FC != '-Inf')
 head(p_bh)
@@ -478,7 +481,7 @@ dev.off()
 
 nrow(hits %>% filter(pv_bh < 0.05)) #562
 
-CairoSVG(file=paste("../Figures/volcano_reps.svg", sep = ""), width = 5, height = 5, bg = "white")
+CairoSVG(file=paste("../Figures/volcano_reps.svg", sep = ""), width = 6, height = 7, bg = "white")
 EnhancedVolcano(hits,
                 lab = hits$compound,
                 x = 'l2FC',
@@ -486,13 +489,13 @@ EnhancedVolcano(hits,
                 pCutoff = 0.05,
                 FCcutoff = 0.3,
                 legendPosition = 'bottom',
-                labSize = 0
+                labSize = 3
  )
 dev.off()
 
-CairoSVG(file=paste("../Figures/heatmap_reps.svg", sep = ""), width = 3, height =5, bg = "white")
+CairoSVG(file=paste("../Figures/heatmap_reps.svg", sep = ""), width = 4, height = 6, bg = "white")
 hits %>% filter(pv_bh < 0.05 & (l2FC > 0.3 | l2FC < -0.3)) %>% ggplot(aes(x=Sp_short,y=compound)) + geom_tile(aes(fill=l2FC), color = "white", lwd = 0.1) + theme_bw() +
-     th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), panel.grid = element_blank(), axis.text.y = element_blank()) +
+     th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), panel.grid = element_blank()) +
      scale_fill_gradientn(colours = wes_palette("Zissou1", 100, type = "continuous"))
 dev.off()
 
@@ -510,22 +513,6 @@ ggplot(hits, aes(x=l2FC)) +
 
 h<-hits %>% filter(l2FC > 0)
 nrow(h) #31
-
-## combination compounds
-comb<-p_bh %>% filter(l2FC != '-Inf' & compound %in% c('Advantame-comb','Caffeine','Duloxetine','Vanillin','Cetrizine','Risperidone','Ethinylestradiol','Ranitidine','Montelukast','Acetaminophen','Aripirazole','Ibuprofen'))
-View(comb)
-EnhancedVolcano(comb,
-                lab = comb$compound,
-                x = 'l2FC',
-                y = 'p_bh',
-                pCutoff = 0.05,
-                FCcutoff = 0.3,
-                legendPosition = 'bottom',
-                labSize = 4
-)
-comb %>% filter(p_bh < 0.05 & (l2FC > 0.3 | l2FC < -0.3)) %>% ggplot(aes(x=Sp_short,y=compound)) + geom_tile(aes(fill=l2FC), color = "white", lwd = 0.1) + theme_bw() +
-  th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), panel.grid = element_blank()) +
-  scale_fill_gradientn(colours = wes_palette("Zissou1", 100, type = "continuous"))
 
 # plot of control and plate normalized AUCs
 p_bh %>% filter(combined_pv < 0.05) %>% group_by(Bug_ID,Sp_short,Plate_no) %>% 
@@ -679,7 +666,7 @@ AB %>% dplyr::group_by(Bug_ID,Sp_short,compound,Replicate_no,Plate_no) %>%
   ggplot(aes(x=SFaq,y=SFa+SFq)) + geom_point(aes(color=comb_comp), size=0.0001) + geom_abline() + theme_bw() +
   scale_y_continuous(name = "Expected viability") + 
   scale_x_continuous(name = "Observed viability") + scale_color_npg() + 
-  facet_wrap(~Sp_short, scales = "free") + th + theme(legend.position = 'none')
+  facet_wrap(~Sp_short, scales = "free") + th 
 dev.off()
 
 sig_bliss<-AB %>% filter(pv < 0.05)
@@ -699,20 +686,21 @@ nrow(med_sig) #1162
 CairoSVG(file="../Figures/sig_bliss_cutoffs.svg", width = 5, height = 3, bg = "white")
 med_sig %>% ggplot(aes(x=med_bliss, color = Plate_no)) + scale_color_npg() + th +
   stat_ecdf(geom = 'point', size = 0.001) + scale_x_continuous(breaks = seq(-3,3,by=0.2), name = "bliss independence") + scale_y_continuous(name = "% counts") +
-  theme_minimal() + geom_vline(xintercept = c(0.2,-.2), lwd=0.2, color='red') + theme(legend.position = "none")
+  theme_minimal() + geom_vline(xintercept = c(0.2,-.2), lwd=0.2, color='red') 
 dev.off()
 
-CairoSVG(file="../Figures/sig_bliss_interactions.svg", width = 5, height = 4, bg = "white")
+CairoSVG(file="../Figures/sig_bliss_interactions.svg", width = 6, height = 5.5, bg = "white")
 med_sig %>% filter(med_bliss > 0.2 | med_bliss < -0.2) %>% ggplot(aes(x=Sp_short,y=compound)) + facet_grid(~Plate_no, scales = 'free') + geom_tile(aes(fill=med_bliss)) + theme_bw() +
-  th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), panel.grid = element_blank(), axis.text.y = element_blank()) + 
+  th + theme(axis.text.x = element_text(angle = 90,hjust = 1), axis.ticks = element_blank(), panel.grid = element_blank()) + 
   scale_fill_gradient2() + scale_y_discrete(name = "compounds") 
 dev.off()
 
 
 nrow(med_sig %>% filter(med_bliss > 0.2 | med_bliss < -0.2)) #50
 
+View(AB)
 #case example - synergy
-exam<-AB %>% filter(Bug_ID == 'NT5011', Plate_no == 'plate1+D', compound == 'Iso-Steviol') %>% mutate(expSFaq = exp(SFaq), expSFa = exp(SFa), expSFq = exp(SFq), expected = exp(SFa+SFq))
+exam<-AB %>% filter(Bug_ID == 'NT5023', Plate_no == 'plate1+C', compound == 'Sorbitol') %>% mutate(expSFaq = exp(SFaq), expSFa = exp(SFa), expSFq = exp(SFq), expected = exp(SFa+SFq))
 head(exam)
 
 CairoSVG(file="../Figures/Isosteviol+D_synergy.svg", width = 4, height = 3, bg = "white")
