@@ -435,8 +435,8 @@ head(znormAUCs)
 # t-test bug wise and replicate wise
 hits_BR<-znormAUCs %>% filter(Plate_no == 'plate1') %>% dplyr::group_by(Bug_ID, Plate_no, Replicate_no) %>% 
   do(unpairedT_pval(.))
-head(hits_BR)
-nrow(hits_BR) #17,182
+View(hits_BR)
+nrow(hits_BR) #3067
 
 hits_BR_noDMSO<-hits_BR %>% filter(compound != 'DMSO')
 
@@ -447,15 +447,15 @@ dev.off()
 View(hits_BR_noDMSO)
 
 # #### combining p values across replicates using fisher's (combined_pval)
-pooled_es<-hits_BR_noDMSO %>% dplyr::group_by(Bug_ID,Plate_no,compound,Phyla,Sp_short) %>% do(pool_es(.))
+pooled_es<-hits_BR %>% dplyr::group_by(Bug_ID,Plate_no,compound,Phyla,Sp_short) %>% do(pool_es(.))
 head(pooled_es)
-nrow(pooled_es)
+nrow(pooled_es) #1075
 
-combined_pval<-hits_BR_noDMSO %>% dplyr::group_by(Bug_ID,Plate_no,compound,Phyla,Sp_short) %>% 
+combined_pval<-hits_BR %>% dplyr::group_by(Bug_ID,Plate_no,compound,Phyla,Sp_short) %>% 
   summarise(combined_pv = sumlog(pv)[["p"]], count = length(pv), l2FC = log2(median(avFC))) #log 2 of median FC of replicates
 
 es_pv_l2fc<-merge(pooled_es, combined_pval, by=c('Bug_ID','Plate_no','compound','Phyla','Sp_short'))
-nrow(es_pv_l2fc) #5,925
+nrow(es_pv_l2fc) #1,075
 head(es_pv_l2fc)
 
 
@@ -469,17 +469,17 @@ nrow(es_pv_l2fc %>% filter(Plate_no == 'plate1' & combined_pv < 0.05)) #631
 p_bh<-es_pv_l2fc %>% dplyr::group_by(Bug_ID,Plate_no) %>%
   mutate(pv_bh = p.adjust(combined_pv,method = "BH"))
 head(p_bh)
-nrow(p_bh) #1050
+nrow(p_bh) #1075
 
 hits<-p_bh %>% filter(l2FC != '-Inf')
-head(p_bh)
-nrow(hits) #1,050
+View(p_bh)
+nrow(hits) #1,075
 
 CairoSVG(file=paste("../Figures/pval_bh.svg", sep = ""), width = 3, height = 2, bg = "white")
 hits %>% filter(Plate_no == 'plate1') %>% ggplot(aes(x=pv_bh)) + geom_histogram(color="white",fill="#4d4d4d",bins = 30,lwd=0.1) + th
 dev.off()
 
-nrow(hits %>% filter(pv_bh < 0.05)) #562
+nrow(hits %>% filter(pv_bh < 0.05)) #560
 
 CairoSVG(file=paste("../Figures/volcano_reps.svg", sep = ""), width = 6, height = 7, bg = "white")
 EnhancedVolcano(hits,
@@ -502,8 +502,8 @@ dev.off()
 hits %>% ggplot(aes(x=l2FC)) + geom_density()
 head(hits)
 
-sig_p<-hits %>% filter(pv_bh < 0.05 & (l2FC > 0.3 | l2FC < -0.3))
-nrow(sig_p)
+sig_p<-hits %>% filter(pv_bh < 0.05 & (l2FC > 0.29 | l2FC < -0.29))
+nrow(sig_p) #30
 head(sig_p)
 
 #cumulative distribution frequency plot
@@ -521,10 +521,43 @@ p_bh %>% filter(combined_pv < 0.05) %>% group_by(Bug_ID,Sp_short,Plate_no) %>%
   scale_x_continuous(name = "l2FC") + scale_color_continuous() + 
   facet_wrap(c('Sp_short'), scales = "free") + th + theme_bw()
 
+
+
+
+# combination compound alone
+head(znormAUCs)
+s_znormAUCs<-znormAUCs
+
+
+c_hits_BR<-znormAUCs %>% filter(compound %in% c('Advantame-comb','Caffeine','Duloxetine','Vanillin','DMSO') & Plate_no != 'plate1') %>% dplyr::group_by(Bug_ID, Plate_no, Replicate_no) %>% 
+  do(unpairedT_pval(.))
+head(c_hits_BR)
+nrow(c_hits_BR) #644
+
+c_combined_pval<-c_hits_BR %>% dplyr::group_by(Bug_ID,Plate_no,compound,Phyla,Sp_short) %>% 
+  summarise(combined_pv = sumlog(pv)[["p"]], count = length(pv), l2FC = log2(median(avFC))) #log 2 of median FC of replicates
+c_p_bh<-c_combined_pval %>% dplyr::group_by(Bug_ID,Plate_no) %>%
+  mutate(pv_bh = p.adjust(combined_pv,method = "BH"))
+
+View(c_p_bh)
+nrow(c_p_bh)
+
+cc<-merge(c_p_bh,c_hits_BR,by=c('Bug_ID','compound','Plate_no','Phyla','Sp_short'))
+
+View(cc)
+
+cc %>% filter(pv_bh < 0.05 | compound == 'DMSO') %>% dplyr::group_by(Bug_ID,Replicate_no,Plate_no) %>% ggplot(aes(x=compound, y=log2(avFC))) + geom_boxplot(aes(fill=compound), lwd=0.1, alpha=0.8) +
+  facet_wrap(~Bug_ID, scales = 'free') + scale_fill_nejm() + th + theme(axis.text.x = element_blank()) + geom_jitter(size=0.5) +
+  scale_color_nejm()
+
+
+
+
+
 ############## Bliss interactions
 znormAUCs<-read.table(file = "../Figures/znormAUCs", header = TRUE, stringsAsFactors = FALSE)
-nrow(znormAUCs %>% filter(compound != 'DMSO')) #37,507
-head(znormAUCs)
+#nrow(znormAUCs %>% filter(compound != 'DMSO')) #37,507
+View(znormAUCs)
 
 # take log of AUCs
 znormAUCs<-znormAUCs[,c(1:7,9,10)] %>% filter(compound != 'DMSO') %>% dplyr::group_by(Bug_ID,Replicate_no,Plate_no,compound,Phyla,Sp_short,col_name) %>% 
@@ -696,7 +729,7 @@ med_sig %>% filter(med_bliss > 0.2 | med_bliss < -0.2) %>% ggplot(aes(x=Sp_short
 dev.off()
 
 
-nrow(med_sig %>% filter(med_bliss > 0.2 | med_bliss < -0.2)) #50
+View(med_sig %>% filter(med_bliss > 0.2 | med_bliss < -0.2)) #50
 
 View(AB)
 #case example - synergy
