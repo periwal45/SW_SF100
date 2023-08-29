@@ -35,7 +35,7 @@ unpairedT_pval<-function(bug_aucs){
   comp<-unique(samples$compound)
   comp
   
-  ref_aucs<-(bug_aucs %>% filter(compound == 'DMSO'))$czscoreAUC
+  ref_aucs<-(bug_aucs %>% filter(compound == 'DMSO'))$cAUC
   ref_aucs
   
   out_df<-data.frame(stringsAsFactors = FALSE)
@@ -50,14 +50,14 @@ unpairedT_pval<-function(bug_aucs){
     entry
     
     Bug_ID = entry$Bug_ID[1]
-    Replicate_no = entry$Replicate_no[1]
+    #Replicate_no = entry$Replicate_no[1]
     Plate_no = entry$Plate_no[1]
     compound = entry$compound[1]
     Phyla = entry$Phyla[1]
     Sp_short = entry$Sp_short[1]
     
     
-    samp_aucs<-(samples %>% filter(compound == comp[i]))$czscoreAUC
+    samp_aucs<-(samples %>% filter(compound == comp[i]))$cAUC
     print(samp_aucs)
     print(length(samp_aucs))
     
@@ -82,7 +82,7 @@ unpairedT_pval<-function(bug_aucs){
     lci<-esize$ci.lo
     uci<-esize$ci.hi
     
-    z<-data.frame(Bug_ID,Replicate_no,Plate_no,compound,Phyla,Sp_short,pv,conf.int.lower,conf.int.upper,es,gse,lci,uci,ref,sam,t_stat,avFC)
+    z<-data.frame(Bug_ID,Plate_no,compound,Phyla,Sp_short,pv,conf.int.lower,conf.int.upper,es,gse,lci,uci,ref,sam,t_stat,avFC)
     z
   
     out_df<-rbind(out_df,z)
@@ -132,24 +132,29 @@ t_distr<-function(y){
   n2 = length(y$SFq)
   n3 = length(y$SFaq)
   
-  y1=mean(y$SFa)
-  y2=mean(y$SFq)
-  y3=mean(y$SFaq) 
+  lA = log(y$SFa)
+  lB = log(y$SFq)
+  lC = log(y$SFaq)
   
-  s1=var(y$SFa)*(n1-1)
-  s2=var(y$SFq)*(n2-1)
-  s3=var(y$SFaq)*(n3-1)
+  y1=mean(lA)
+  y2=mean(lB)
+  y3=mean(lC) 
   
-  sy=s1+s2+s3
-  dft=n1+n2+n3-3
-  denf=1/n1+1/n2+1/n3
-  tss=(y1+y2-y3)/sqrt(sum(sy)/dft)/denf
+  s1=var(lA)*(n1-1)
+  s2=var(lB)*(n2-1)
+  s3=var(lC)*(n3-1)
+  
+  sy=s1+s2+s3 #sum of squares
+  dft=n1+n2+n3-3 #degrees of freedom
+  denf=(1/n1)+(1/n2)+(1/n3) 
+  tss=(y1+y2-y3)/sqrt(sum(sy)/dft)/denf #t-statistic
   pv=2*(1-pt(abs(tss),df=dft))
   pvP=1-pt(tss,df=dft)
   
   #n - no of observations (replicates), sy - total sum of squares, dft,denf - df, tss - t-statistic, pv - p-value for Bliss independence hypothesis, pvP - One-sided p-value
   
-  df<-data.frame("T-stat" = tss, "bliss_score" = y1+y2-y3, "bliss" = exp(y1+y2-y3), "pval" = pv)
+  df<-data.frame("T-stat" = tss, "bliss_null" = y1+y2-y3, "bliss" = exp(y1+y2-y3), "pval" = pv, "mean_SFaq" = y3,
+                 "mean_SFa" = y1, "mean_SFq" = y2, "n_SFa" = n1, "n_SFq" = n2, "n_SFaq" = n3, "one-sided-pv" = pvP)
   return(df)
   
 }
@@ -157,9 +162,10 @@ t_distr<-function(y){
 anov<-function(y){
 
   res.aov<-aov(y$SFaq ~ y$SFa+y$SFq, data=y)
-  pv<-summary(res.aov)[[1]][["Pr(>F)"]][1]
-  df<-summary(res.aov)[[1]][["Df"]][3]
-  f_val<-summary(res.aov)[[1]][["F value"]][1]
+  print(summary(res.aov))
+  pv<-summary(res.aov)[[1]][["Pr(>F)"]][3]
+  df<-summary(res.aov)[[1]][["Df"]][4]
+  f_val<-summary(res.aov)[[1]][["F value"]][3]
   
   if(length(pv) & length(df) & length(f_val) > 0){
     
