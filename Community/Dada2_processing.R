@@ -56,14 +56,14 @@ head(out)
 
 #percentage of reads filtered
 out_percent<-out %>% mutate(percent_filtered = reads.out/reads.in)
-View(out_percent)
+#View(out_percent)
 
 ### Learn error rates
 
 errF <- learnErrors(filtFs, multithread=TRUE)
-#107539950 total bases in 467565 reads from 7 samples will be used for learning the error rates.
+#107548920 total bases in 467604 reads from 7 samples will be used for learning the error rates.
 errR <- learnErrors(filtRs, multithread=TRUE)
-#112215600 total bases in 467565 reads from 7 samples will be used for learning the error rates.
+#112224960 total bases in 467604 from 7 samples will be used for learning the error rates.
 
 #plot errors
 plotErrors(errF, nominalQ=TRUE)
@@ -74,8 +74,8 @@ plotErrors(errR, nominalQ=TRUE)
 dadaFs <- dada(filtFs, err=errF, multithread=TRUE)
 dadaRs <- dada(filtRs, err=errR, multithread=TRUE)
 
-dadaFs[[20]]
-dadaRs[[20]]
+#dadaFs[[20]]
+#dadaRs[[20]]
 
 ### Merge paired reads
 
@@ -148,9 +148,9 @@ ps
 
 ###save files
 asv_table<-data.frame(t(otu_table(ps)))
-View(asv_table)
+#View(asv_table)
 df0 <- tibble::rownames_to_column(asv_table, "ASV")
-View(df0)
+#View(df0)
 write.table(df0, file = "~/ShikiFactory/WP3/SW_SF100/Community/sweet_community/ASV_25bugs.tsv", sep = '\t', row.names = FALSE)
 
 #change sample names of ASV_25bugs in text editor
