@@ -1,0 +1,7 @@
+Bug_ID	Plate_no	Replicate_no	Phyla	Sp_short	compound	col_name	SFaq	SFa	comb_comp	SFq	null_hyp	exp_eff
+NT5011	plate1+D	Rep1	Firmicutes	R. intestinalis	Iso-Steviol	E7	0.17	1.02	Duloxetine	0.52	1.37	1.54
+NT5011	plate1+D	Rep1	Firmicutes	R. intestinalis	Iso-Steviol	E8	0.05	0.86	Duloxetine	0.52	1.33	1.38
+NT5011	plate1+D	Rep2	Firmicutes	R. intestinalis	Iso-Steviol	E7	0.3	1.24	Duloxetine	0.45	1.39	1.69
+NT5011	plate1+D	Rep2	Firmicutes	R. intestinalis	Iso-Steviol	E8	0.14	1.08	Duloxetine	0.45	1.39	1.53
+NT5011	plate1+D	Rep3	Firmicutes	R. intestinalis	Iso-Steviol	E7	0.19	1.04	Duloxetine	0.33	1.18	1.37
+NT5011	plate1+D	Rep3	Firmicutes	R. intestinalis	Iso-Steviol	E8	0.09	0.99	Duloxetine	0.33	1.23	1.32
