@@ -16,14 +16,14 @@ Scripts:
      -Bliss interactions: compounds in combination and statistical determination of synergy & antagonism\
    
 2. Functions.R - used in Fig. 1\
-     -common repeated functions called into primary_screen.R
-     -function for two sample welch test
-     -function to pool effect sizes
-     -statistical determination of synergy/antagonism
+     -common repeated functions called into primary_screen.R\
+     -function for two sample welch test\
+     -function to pool effect sizes\
+     -statistical determination of synergy/antagonism\
 
 3. p6.R - used in Appendix Figure S4\
-     -additional xenobiotic interactions plate (sweeteners-commonly used drugs)
-     -bliss interactions of all combinations of sweeteners and commonly used drugs
+     -additional xenobiotic interactions plate (sweeteners-commonly used drugs)\
+     -bliss interactions of all combinations of sweeteners and commonly used drugs\
 
 4. p6_Functions.R - used in Appendix Figure S4\
-     -functions sourced in p6.R
+     -functions sourced in p6.R\
