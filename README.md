@@ -7,13 +7,13 @@ The data folder contains raw OD values taken every hour for 24 hours for all mic
 
 Scripts:
 1. primary_screen.R - used in Fig. 1\
-     -reads raw OD values and fits growth curves on each plate for all replicates
-     -plots all fitted growth curves
-     -QC: does data cleaning on fitted curves
-     -Normalizes: plate based normalization of area under the curve
-     -Hit selection: two sample welch t-test
-     -log2fold change calculation
-     -Bliss interactions: compounds in combination and statistical determination of synergy & antagonism
+     -reads raw OD values and fits growth curves on each plate for all replicates\
+     -plots all fitted growth curves\
+     -QC: does data cleaning on fitted curves\
+     -Normalizes: plate based normalization of area under the curve\
+     -Hit selection: two sample welch t-test\
+     -log2fold change calculation\
+     -Bliss interactions: compounds in combination and statistical determination of synergy & antagonism\
    
 2. Functions.R - used in Fig. 1\
      -common repeated functions called into primary_screen.R
