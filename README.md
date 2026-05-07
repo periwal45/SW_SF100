@@ -1,11 +1,11 @@
 README\
 Manuscript title: Impact of low-calorie sweeteners on gut bacteria is modulated by common xenobiotics\
-This repository contains code for processing, cleaning, and analysing data from primary screening microbial assays.\
+This repository contains code for processing, cleaning, and analysing data from primary screening microbial assays\
 
-Data:
-The data folder contains raw OD values taken every hour for 24 hours for all microbes for all biological replicates. The folder also contains intermediary files generated such as fitted curves, fitted values, merged replicates and filtered hits. The raw OD files can be used to re-run the scripts mentioned below.
+Data:\
+The data folder contains raw OD values taken every hour for 24 hours for all microbes for all biological replicates. The folder also contains intermediary files generated such as fitted curves, fitted values, merged replicates and filtered hits. The raw OD files can be used to re-run the scripts mentioned below\
 
-Scripts:
+Scripts:\
 1. primary_screen.R - used in Fig. 1
      -reads raw OD values and fits growth curves on each plate for all replicates
      -plots all fitted growth curves
