@@ -1,12 +1,24 @@
 Bug_ID	Phyla	Species	Sp_short
-NT5002	Bacteroidetes	Bacteroides uniformis	B. uniformis
-NT5003	Bacteroidetes	Bacteroides fragilis	B. fragilis
-NT5026	Firmicutes	Clostridium bolteae	C. bolteae
-NT5038	Firmicutes	Streptococcus salivarius	S. salivarius
-NT5019	Bacteroidetes	Prevotella copri	P. copri
-NT5037	Firmicutes	Clostridium saccharolyticum	C. saccharolyticum
-NT24007	Firmicutes	Clostridium symbiosum	C. symbiosum
 NT5001	Bacteroidetes	Bacteroides vulgatus	B. vulgatus
+NT5004	Bacteroidetes	Bacteroides thetaiotaomicron	B. thetaiotaomicron
+NT5009	Firmicutes	Eubacterium rectale	E. rectale
+NT5011	Firmicutes	Roseburia intestinalis	R. intestinalis
+NT5019	Bacteroidetes	Prevotella copri	P. copri
+NT5021	Verrucomicrobia	Akkermansia muciniphila	A. muciniphila
+NT5025	Fusobacteria	Fusobacterium nucleatum	F. nucleatum
+NT5026	Firmicutes	Clostridium bolteae	C. bolteae
+NT5028	Actinobacteria	Bifidobacterium longum	B. longum
+NT5042	Firmicutes	Lactobacillus paracasei	L. paracasei
+NT5046	Firmicutes	Ruminococcus gnavus	R. gnavus
+NT5047	Firmicutes	Ruminococcus torques	R. torques
+NT5054	Bacteroidetes	Bacteroides ovatus	B. ovatus
+NT5069	Firmicutes	Blautia obeum	B. obeum
+NT5072	Firmicutes	Streptococcus parasanguinis	S. parasanguinis
+NT5074	Bacteroidetes	Parabacteroides distasonis	P. distasonis
+NT5076	Firmicutes	Dorea formicigenerans	D. formicigenerans
 NT5078	Proteobacteria	Escherichia coli ED1a	E. coli ED1a
-NT5023	Actinobacteria	Bifidobacterium longum infantis	B. longum infantis
-
+NT5081	Bacteroidetes	Odoribacter splanchnicus	O. splanchnicus
+NT5083	Firmicutes	Clostridiodes difficile	C. difficile
+NT5003	Bacteroidetes	Bacteroides fragilis	B. fragilis
+NT5022	Actinobacteria	Bifidobacterium adolescentis	B. adolescentis
+NT5048	Firmicutes	Coprococcus comes	C. comes
